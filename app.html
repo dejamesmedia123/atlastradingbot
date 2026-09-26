@@ -94,9 +94,12 @@ function gs(fnName, ...args) {
       resolve(mockBackend(fnName, args));
       return;
     }
-    // Sent as a plain-text body (not application/json) so the browser treats this as a
-    // "simple request" and skips the CORS preflight OPTIONS call Apps Script can't answer.
-    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ fn: fnName, args }) })
+    // GET, with the call encoded in the query string. Apps Script's /exec URL replies with
+    // a redirect to actually run the request, and browsers silently turn a POST into a GET
+    // (dropping the body) when following it — so POST-based RPC calls never really arrive.
+    // GET isn't affected by that, which is why every call (reads AND writes) goes this way.
+    const url = SCRIPT_URL + '?fn=' + encodeURIComponent(fnName) + '&args=' + encodeURIComponent(JSON.stringify(args));
+    fetch(url)
       .then(res => res.json())
       .then(data => {
         if (data && data.ok) resolve(data.result);
