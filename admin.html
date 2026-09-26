@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AtlasTradeAI — Admin</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0E14; --surface:rgba(255,255,255,0.045); --surface-strong:rgba(255,255,255,0.08);
+    --border:rgba(255,255,255,0.09); --text:#E8EDF2; --muted:#8B96A5;
+    --mint:#2DD9A8; --mint-dim:rgba(45,217,168,0.14);
+    --gold:#F0B429; --gold-dim:rgba(240,180,41,0.14);
+    --rose:#FB7185; --rose-dim:rgba(251,113,133,0.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;
+    padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+  .glass{ background:var(--surface); border:1px solid var(--border); backdrop-filter:blur(18px); border-radius:16px; }
+  .glass-strong{ background:var(--surface-strong); border:1px solid var(--border); backdrop-filter:blur(18px); border-radius:16px; }
+  .muted{color:var(--muted);}
+  ::-webkit-scrollbar{display:none;}
+  .btn-primary{ background:var(--mint); color:#08110D; font-weight:600; border-radius:12px; padding:11px 16px; }
+  .btn-primary:active{opacity:.85;}
+  .btn-primary:disabled{opacity:.35;}
+  .btn-ghost{ background:var(--surface-strong); border:1px solid var(--border); color:var(--text); border-radius:12px; padding:11px 16px; }
+  .btn-danger{ background:var(--rose-dim); color:var(--rose); border-radius:12px; padding:9px 14px; font-size:13px; }
+  .chip{border-radius:999px; padding:4px 11px; font-size:12px; font-weight:600;}
+  input, select, textarea{
+    background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--text);
+    border-radius:10px; padding:10px 12px; width:100%; font-family:'Inter',sans-serif; font-size:14px;
+  }
+  input::placeholder, textarea::placeholder{color:var(--muted);}
+  input:focus, select:focus, textarea:focus{outline:none; border-color:var(--mint);}
+  label.field-label{font-size:11px; color:var(--muted); display:block; margin-bottom:4px;}
+</style>
+</head>
+<body>
+
+<div id="app" class="max-w-lg mx-auto min-h-screen flex flex-col pb-24">
+  <div id="screen" class="flex-1 px-4 pt-5"></div>
+
+  <nav id="bottomNav" class="fixed bottom-0 left-0 right-0 max-w-lg mx-auto px-4 hidden" style="padding-bottom:calc(env(safe-area-inset-bottom,0px) + 10px)">
+    <div class="glass-strong flex justify-around items-center py-2.5 mt-3 overflow-x-auto">
+      <button data-tab="stats" class="nav-btn flex flex-col items-center gap-1 px-2 py-1"><i data-lucide="gauge" class="w-5 h-5"></i><span class="text-[10px]">Stats</span></button>
+      <button data-tab="bots" class="nav-btn flex flex-col items-center gap-1 px-2 py-1"><i data-lucide="bot" class="w-5 h-5"></i><span class="text-[10px]">Bots</span></button>
+      <button data-tab="trades" class="nav-btn flex flex-col items-center gap-1 px-2 py-1"><i data-lucide="line-chart" class="w-5 h-5"></i><span class="text-[10px]">Trades</span></button>
+      <button data-tab="deposits" class="nav-btn flex flex-col items-center gap-1 px-2 py-1"><i data-lucide="inbox" class="w-5 h-5"></i><span class="text-[10px]">Deposits</span></button>
+      <button data-tab="withdrawals" class="nav-btn flex flex-col items-center gap-1 px-2 py-1"><i data-lucide="arrow-up-from-line" class="w-5 h-5"></i><span class="text-[10px]">Withdraw</span></button>
+      <button data-tab="affiliates" class="nav-btn flex flex-col items-center gap-1 px-2 py-1"><i data-lucide="share-2" class="w-5 h-5"></i><span class="text-[10px]">Affiliates</span></button>
+      <button data-tab="flags" class="nav-btn flex flex-col items-center gap-1 px-2 py-1"><i data-lucide="flag" class="w-5 h-5"></i><span class="text-[10px]">Flags</span></button>
+      <button data-tab="more" class="nav-btn flex flex-col items-center gap-1 px-2 py-1"><i data-lucide="more-horizontal" class="w-5 h-5"></i><span class="text-[10px]">More</span></button>
+    </div>
+  </nav>
+</div>
+
+<script>
+const tg = window.Telegram ? window.Telegram.WebApp : null;
+if (tg) { tg.ready(); tg.expand(); }
+const tgUser = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) || { id: 'demo_admin' };
+const TELEGRAM_ID = String(tgUser.id);
+
+let STATE = { role: null, bots: [] };
+
+// Backend is now a static-friendly Google Apps Script JSON API (no more google.script.run,
+// since this page is hosted on GitHub Pages, not served by Apps Script). Set this to your
+// deployment's /exec URL.
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx40Xn2jCWizJDV99DB5x2UXz56G9xPQYDXPj9J6p2OmS2eXCkrZmw95IPKAQFTWq49xg/exec';
+
+function gs(fnName, ...args) {
+  return new Promise((resolve) => {
+    if (!SCRIPT_URL) {
+      console.warn('preview mode (no SCRIPT_URL set):', fnName, args);
+      resolve(mockBackend(fnName, args));
+      return;
+    }
+    // Sent as a plain-text body (not application/json) so the browser treats this as a
+    // "simple request" and skips the CORS preflight OPTIONS call Apps Script can't answer.
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ fn: fnName, args }) })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.ok) resolve(data.result);
+        else { console.error('Backend error for', fnName, data && data.error); resolve(mockBackend(fnName, args)); }
+      })
+      .catch(err => {
+        console.error('Network error calling backend, falling back to preview mode:', fnName, err);
+        resolve(mockBackend(fnName, args));
+      });
+  });
+}
+
+async function boot() {
+  lucide.createIcons();
+  const ok = await gs('isAdmin', TELEGRAM_ID);
+  if (!ok) return renderUnauthorized();
+  STATE.role = await gs('getAdminRole', TELEGRAM_ID);
+  document.getElementById('bottomNav').classList.remove('hidden');
+  document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => goTab(b.dataset.tab)));
+  STATE.bots = await gs('getBots');
+  goTab('stats');
+}
+
+function renderUnauthorized() {
+  document.getElementById('screen').innerHTML = `
+    <div class="pt-24 flex flex-col items-center text-center gap-3">
+      <i data-lucide="shield-alert" class="w-7 h-7" style="color:var(--rose)"></i>
+      <h1 class="text-lg font-semibold">Not authorized</h1>
+      <p class="muted text-sm">Telegram ID ${TELEGRAM_ID} is not in the Admins sheet. The first person to ever open this admin page was auto-granted super admin — ask them to add you from Admins → Add admin.</p>
+    </div>`;
+  lucide.createIcons();
+}
+
+function setActiveNav(tab) { document.querySelectorAll('.nav-btn').forEach(b => b.style.color = b.dataset.tab === tab ? 'var(--mint)' : 'var(--muted)'); }
+
+async function goTab(tab) {
+  setActiveNav(tab);
+  if (tab === 'stats') return renderStats();
+  if (tab === 'bots') return renderBotsList();
+  if (tab === 'trades') return renderTradesBotPicker();
+  if (tab === 'deposits') return renderDeposits();
+  if (tab === 'withdrawals') return renderWithdrawals();
+  if (tab === 'affiliates') return renderAffiliates();
+  if (tab === 'flags') return renderFlags();
+  if (tab === 'more') return renderMore();
+}
+
+function screenHeader(title, actionHtml) { return `<div class="flex justify-between items-center mb-4"><h1 class="text-xl font-semibold">${title}</h1>${actionHtml||''}</div>`; }
+function isSuper() { return STATE.role === 'super'; }
+
+// ================= STATS =================
+async function renderStats() {
+  const s = await gs('adminGetStats', TELEGRAM_ID);
+  document.getElementById('screen').innerHTML =
+    screenHeader('Overview') +
+    `<div class="grid grid-cols-2 gap-3">
+      ${metricTile('Total AUM', '$' + s.totalAUM.toFixed(2), 'var(--mint)')}
+      ${metricTile('Active users', s.activeUsers, 'var(--text)')}
+      ${metricTile('Pending deposits', s.pendingDeposits, s.pendingDeposits ? 'var(--gold)' : 'var(--text)')}
+      ${metricTile('Pending withdrawals', s.pendingWithdrawals, s.pendingWithdrawals ? 'var(--gold)' : 'var(--text)')}
+      ${metricTile('Payouts due', s.pendingPayouts, s.pendingPayouts ? 'var(--gold)' : 'var(--text)')}
+      ${metricTile('Open flags', s.openFlags, s.openFlags ? 'var(--rose)' : 'var(--text)')}
+    </div>
+    <p class="muted text-xs mt-5">Signed in as ${STATE.role === 'super' ? 'super admin' : 'support admin'}</p>`;
+  lucide.createIcons();
+}
+
+function metricTile(label, value, color) {
+  return `<div class="glass p-4"><p class="muted text-[11px]">${label}</p><p class="font-semibold text-xl mt-1" style="color:${color}">${value}</p></div>`;
+}
+
+// ================= BOTS =================
+async function renderBotsList() {
+  STATE.bots = await gs('getBots');
+  document.getElementById('screen').innerHTML =
+    screenHeader('Bots', isSuper() ? `<button id="addBotBtn" class="btn-primary flex items-center gap-1 text-sm px-3 py-2"><i data-lucide="plus" class="w-4 h-4"></i>Add</button>` : '') +
+    `<div class="flex flex-col gap-3">${STATE.bots.map(adminBotCard).join('') || emptyState('bot','No bots yet','Add your first trading bot.')}</div>`;
+  lucide.createIcons();
+  if (isSuper()) {
+    document.getElementById('addBotBtn').addEventListener('click', () => renderBotForm(null));
+    document.querySelectorAll('[data-edit-bot]').forEach(el => el.addEventListener('click', () => renderBotForm(STATE.bots.find(b => String(b.id) === el.dataset.editBot))));
+    document.querySelectorAll('[data-delete-bot]').forEach(el => el.addEventListener('click', async () => {
+      if (!confirm('Remove this bot? It will be hidden from users.')) return;
+      await gs('adminDeleteBot', TELEGRAM_ID, el.dataset.deleteBot);
+      renderBotsList();
+    }));
+  }
+  document.querySelectorAll('[data-waitlist-bot]').forEach(el => el.addEventListener('click', () => renderWaitlist(el.dataset.waitlistBot)));
+}
+
+function adminBotCard(bot) {
+  return `<div class="glass p-4">
+    <div class="flex justify-between items-start">
+      <div><h3 class="font-semibold text-sm">${escapeHtml(bot.name)}</h3><p class="muted text-xs mt-0.5">${escapeHtml(bot.tvSymbol||'')} · $${bot.minDeposit||0}–$${bot.maxDeposit||'∞'}</p></div>
+      <span class="chip" style="color:var(--mint);background:var(--mint-dim)">${bot.status||'Active'}</span>
+    </div>
+    <div class="flex gap-2 mt-3">
+      ${isSuper() ? `<button class="btn-ghost text-xs px-3 py-1.5 flex-1" data-edit-bot="${bot.id}">Edit</button><button class="btn-danger flex-1" data-delete-bot="${bot.id}">Remove</button>` : ''}
+      ${bot.waitlistEnabled ? `<button class="btn-ghost text-xs px-3 py-1.5 flex-1" data-waitlist-bot="${bot.id}">Waitlist</button>` : ''}
+    </div>
+  </div>`;
+}
+
+async function renderWaitlist(botId) {
+  const bot = STATE.bots.find(b => String(b.id) === String(botId));
+  const list = await gs('adminGetWaitlist', TELEGRAM_ID, botId);
+  document.getElementById('screen').innerHTML = `
+    <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> Bots</button>
+    ${screenHeader('Waitlist — ' + escapeHtml(bot.name))}
+    <div class="flex flex-col gap-2">${list.map(w => `<div class="glass p-3 text-sm">Telegram ${w.telegramId} · ${fmtDate(w.createdAt)}</div>`).join('') || emptyState('users','No one waiting','Waitlist is empty.')}</div>`;
+  lucide.createIcons();
+  document.getElementById('backBtn').addEventListener('click', renderBotsList);
+}
+
+function renderBotForm(bot) {
+  const b = bot || {};
+  document.getElementById('screen').innerHTML = `
+    <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> Bots</button>
+    <h1 class="text-xl font-semibold mb-4">${bot ? 'Edit bot' : 'Add bot'}</h1>
+    <form id="botForm" class="flex flex-col gap-4">
+      <div class="glass p-4 flex flex-col gap-3">
+        <div><label class="field-label">Name</label><input name="name" value="${escapeAttr(b.name)}" required></div>
+        <div><label class="field-label">Description</label><textarea name="description" rows="3">${escapeHtml(b.description)}</textarea></div>
+        <div><label class="field-label">TradingView symbol</label><input name="tvSymbol" placeholder="e.g. BINANCE:BTCUSDT" value="${escapeAttr(b.tvSymbol)}"></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="field-label">Risk level</label><select name="riskLevel">${['Low','Medium','High'].map(r=>`<option ${b.riskLevel===r?'selected':''}>${r}</option>`).join('')}</select></div>
+          <div><label class="field-label">Asset class</label><input name="assetClass" value="${escapeAttr(b.assetClass)}" placeholder="Forex / Crypto"></div>
+        </div>
+      </div>
+      <div class="glass p-4 flex flex-col gap-3">
+        <p class="text-xs font-semibold" style="color:var(--gold)">Deposit & capital</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="field-label">Min deposit ($)</label><input type="number" name="minDeposit" value="${b.minDeposit||''}" required></div>
+          <div><label class="field-label">Max deposit ($)</label><input type="number" name="maxDeposit" value="${b.maxDeposit||''}"></div>
+          <div><label class="field-label">Min top-up ($)</label><input type="number" name="minTopUp" value="${b.minTopUp||''}"></div>
+          <div><label class="field-label">Min withdrawal ($)</label><input type="number" name="minWithdrawal" value="${b.minWithdrawal||''}"></div>
+          <div><label class="field-label">Withdrawal lock (days)</label><input type="number" name="withdrawalLockDays" value="${b.withdrawalLockDays||0}"></div>
+          <div><label class="field-label">Currencies</label><input name="currencies" value="${escapeAttr(b.currencies)}" placeholder="USD, NGN, USDT"></div>
+        </div>
+      </div>
+      <div class="glass p-4 flex flex-col gap-3">
+        <p class="text-xs font-semibold" style="color:var(--gold)">Fees & payout</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="field-label">Profit share (%)</label><input type="number" name="profitSharePct" value="${b.profitSharePct||0}"></div>
+          <div><label class="field-label">Management fee (%)</label><input type="number" name="managementFeePct" value="${b.managementFeePct||0}"></div>
+          <div class="col-span-2"><label class="field-label">Payout frequency</label><select name="payoutFrequency">${['Daily','Weekly','Monthly','On-demand'].map(f=>`<option ${b.payoutFrequency===f?'selected':''}>${f}</option>`).join('')}</select></div>
+        </div>
+      </div>
+      <div class="glass p-4 flex flex-col gap-3">
+        <p class="text-xs font-semibold" style="color:var(--gold)">Access & risk controls</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="field-label">Max drawdown (%)</label><input type="number" name="maxDrawdownPct" value="${b.maxDrawdownPct||''}"></div>
+          <div><label class="field-label">Auto-pause at drawdown (%)</label><input type="number" name="autoPauseDrawdownPct" value="${b.autoPauseDrawdownPct||''}"></div>
+          <div><label class="field-label">Max subscribers</label><input type="number" name="maxSubscribers" value="${b.maxSubscribers||''}"></div>
+          <div><label class="field-label">Max allocation per user (%)</label><input type="number" name="maxAllocationPct" value="${b.maxAllocationPct||''}"></div>
+          <div><label class="field-label">Country restriction</label><input name="countryRestriction" value="${escapeAttr(b.countryRestriction)}" placeholder="blank = all"></div>
+          <div><label class="field-label">Status</label><select name="status">${['Active','Paused','Closed to new deposits'].map(s=>`<option ${b.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+        </div>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="isPublic" class="w-auto" ${b.isPublic!==false?'checked':''}> Publicly listed</label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="waitlistEnabled" class="w-auto" ${b.waitlistEnabled?'checked':''}> Enable waitlist when full</label>
+      </div>
+      <div class="glass p-4 flex flex-col gap-3">
+        <p class="text-xs font-semibold" style="color:var(--gold)">Affiliate override</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="field-label">Commission override (%)</label><input type="number" name="affiliateCommissionOverridePct" value="${b.affiliateCommissionOverridePct||''}" placeholder="blank = default"></div>
+          <div class="flex items-end pb-2"><label class="flex items-center gap-2 text-sm"><input type="checkbox" name="affiliateEligible" class="w-auto" ${b.affiliateEligible!==false?'checked':''}> Eligible</label></div>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary w-full">Save bot</button>
+      <p id="formMsg" class="text-sm text-center"></p>
+    </form>
+  `;
+  lucide.createIcons();
+  document.getElementById('backBtn').addEventListener('click', renderBotsList);
+  document.getElementById('botForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const payload = Object.fromEntries(fd.entries());
+    payload.isPublic = fd.has('isPublic'); payload.waitlistEnabled = fd.has('waitlistEnabled'); payload.affiliateEligible = fd.has('affiliateEligible');
+    if (bot) payload.id = bot.id;
+    try { await gs('adminSaveBot', TELEGRAM_ID, payload); renderBotsList(); }
+    catch (err) { document.getElementById('formMsg').textContent = err.message; document.getElementById('formMsg').style.color = 'var(--rose)'; }
+  });
+}
+
+// ================= TRADES =================
+function renderTradesBotPicker() {
+  document.getElementById('screen').innerHTML =
+    screenHeader('Trades') +
+    `<p class="muted text-sm mb-3">Select a bot to manage its trades</p>
+    <div class="flex flex-col gap-2">
+      ${STATE.bots.map(b => `<button class="glass p-3.5 text-left flex justify-between items-center" data-pick-bot="${b.id}"><span class="text-sm font-medium">${escapeHtml(b.name)}</span><i data-lucide="chevron-right" class="w-4 h-4 muted"></i></button>`).join('') || emptyState('bot','No bots yet','Add a bot first.')}
+    </div>`;
+  lucide.createIcons();
+  document.querySelectorAll('[data-pick-bot]').forEach(el => el.addEventListener('click', () => renderTradesForBot(el.dataset.pickBot)));
+}
+
+async function renderTradesForBot(botId) {
+  const bot = STATE.bots.find(b => String(b.id) === String(botId));
+  const trades = await gs('getTrades', botId);
+  document.getElementById('screen').innerHTML = `
+    <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> Trades</button>
+    ${screenHeader(escapeHtml(bot.name), `<button id="addTradeBtn" class="btn-primary flex items-center gap-1 text-sm px-3 py-2"><i data-lucide="plus" class="w-4 h-4"></i>Add</button>`)}
+    <button id="importBtn" class="btn-ghost w-full mb-4 flex items-center justify-center gap-2 text-sm"><i data-lucide="upload" class="w-4 h-4"></i>Bulk import CSV</button>
+    <div class="flex flex-col gap-2">${trades.map(adminTradeRow).join('') || emptyState('line-chart','No trades yet','Log the first trade for this bot.')}</div>`;
+  lucide.createIcons();
+  document.getElementById('backBtn').addEventListener('click', renderTradesBotPicker);
+  document.getElementById('addTradeBtn').addEventListener('click', () => renderTradeForm(bot, null));
+  document.getElementById('importBtn').addEventListener('click', () => renderBulkImport(bot));
+  document.querySelectorAll('[data-edit-trade]').forEach(el => el.addEventListener('click', () => gs('getTrades', botId).then(ts => renderTradeForm(bot, ts.find(t => String(t.id) === el.dataset.editTrade)))));
+  document.querySelectorAll('[data-delete-trade]').forEach(el => el.addEventListener('click', async () => {
+    if (!confirm('Delete this trade?')) return;
+    await gs('adminDeleteTrade', TELEGRAM_ID, el.dataset.deleteTrade);
+    renderTradesForBot(botId);
+  }));
+}
+
+function adminTradeRow(t) {
+  const profit = Number(t.profitPct||0);
+  return `<div class="glass p-3 flex justify-between items-center">
+    <div><p class="text-sm font-medium">${escapeHtml(t.symbol)} · ${escapeHtml(t.side||'')}</p><p class="muted text-[11px]">${fmtDate(t.openedAt)}</p></div>
+    <div class="flex items-center gap-3">
+      <span class="text-sm font-semibold" style="color:${profit>=0?'var(--mint)':'var(--rose)'}">${profit>=0?'+':''}${profit.toFixed(2)}%</span>
+      <button data-edit-trade="${t.id}"><i data-lucide="pencil" class="w-3.5 h-3.5 muted"></i></button>
+      <button data-delete-trade="${t.id}"><i data-lucide="trash-2" class="w-3.5 h-3.5" style="color:var(--rose)"></i></button>
+    </div>
+  </div>`;
+}
+
+function renderTradeForm(bot, trade) {
+  const t = trade || {};
+  document.getElementById('screen').innerHTML = `
+    <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> ${escapeHtml(bot.name)}</button>
+    <h1 class="text-xl font-semibold mb-4">${trade ? 'Edit trade' : 'Add trade'}</h1>
+    <form id="tradeForm" class="glass p-4 flex flex-col gap-3">
+      <div><label class="field-label">Symbol</label><input name="symbol" value="${escapeAttr(t.symbol)}" required placeholder="EUR/USD"></div>
+      <div><label class="field-label">Side</label><select name="side"><option ${t.side==='Long'?'selected':''}>Long</option><option ${t.side==='Short'?'selected':''}>Short</option></select></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="field-label">Entry price</label><input type="number" step="any" name="entry" value="${t.entry||''}"></div>
+        <div><label class="field-label">Exit price</label><input type="number" step="any" name="exit" value="${t.exit||''}"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="field-label">Profit (%)</label><input type="number" step="any" name="profitPct" value="${t.profitPct||''}"></div>
+        <div><label class="field-label">Profit ($)</label><input type="number" step="any" name="profitUsd" value="${t.profitUsd||''}"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="field-label">Opened at</label><input type="datetime-local" name="openedAt" value="${toLocalInput(t.openedAt)}"></div>
+        <div><label class="field-label">Closed at</label><input type="datetime-local" name="closedAt" value="${toLocalInput(t.closedAt)}"></div>
+      </div>
+      <button type="submit" class="btn-primary w-full mt-1">Save trade</button>
+      <p id="formMsg" class="text-sm text-center"></p>
+    </form>`;
+  lucide.createIcons();
+  document.getElementById('backBtn').addEventListener('click', () => renderTradesForBot(bot.id));
+  document.getElementById('tradeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const payload = Object.fromEntries(fd.entries());
+    payload.botId = bot.id;
+    if (trade) payload.id = trade.id;
+    try { await gs('adminSaveTrade', TELEGRAM_ID, payload); renderTradesForBot(bot.id); }
+    catch (err) { document.getElementById('formMsg').textContent = err.message; document.getElementById('formMsg').style.color = 'var(--rose)'; }
+  });
+}
+
+function renderBulkImport(bot) {
+  document.getElementById('screen').innerHTML = `
+    <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> ${escapeHtml(bot.name)}</button>
+    <h1 class="text-xl font-semibold mb-2">Bulk import trades</h1>
+    <p class="muted text-xs mb-4">One trade per line: symbol,side,entry,exit,profitPct,profitUsd,openedAt,closedAt</p>
+    <textarea id="csvInput" rows="10" placeholder="EUR/USD,Long,1.085,1.091,0.55,55,2026-09-01T10:00,2026-09-01T14:00"></textarea>
+    <button id="importSubmit" class="btn-primary w-full mt-4">Import</button>
+    <p id="importMsg" class="text-sm text-center mt-3"></p>
+  `;
+  lucide.createIcons();
+  document.getElementById('backBtn').addEventListener('click', () => renderTradesForBot(bot.id));
+  document.getElementById('importSubmit').addEventListener('click', async () => {
+    const msgEl = document.getElementById('importMsg');
+    try {
+      const result = await gs('adminBulkImportTrades', TELEGRAM_ID, bot.id, document.getElementById('csvInput').value);
+      msgEl.style.color = 'var(--mint)'; msgEl.textContent = result.imported + ' trades imported.';
+      setTimeout(() => renderTradesForBot(bot.id), 1000);
+    } catch (err) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = err.message; }
+  });
+}
+
+// ================= DEPOSITS =================
+async function renderDeposits() {
+  const deposits = await gs('getPendingDeposits', TELEGRAM_ID);
+  document.getElementById('screen').innerHTML =
+    screenHeader('Pending deposits') +
+    `<div class="flex flex-col gap-2">
+      ${deposits.map(d => `
+      <div class="glass p-3.5">
+        <div class="flex justify-between items-center"><span class="text-sm font-medium">$${Number(d.amount).toFixed(2)} ${d.currency}</span><span class="muted text-[11px]">${fmtDate(d.createdAt)}</span></div>
+        <p class="muted text-xs mt-1">Telegram ${d.telegramId} · ${escapeHtml(d.method)}</p>
+        ${d.proofUrl ? `<p class="text-xs mt-1" style="color:var(--gold)">Proof: ${escapeHtml(d.proofUrl)}</p>` : ''}
+        <div class="flex gap-2 mt-3">
+          <button class="btn-primary flex-1 py-2 text-sm" data-approve="${d.id}">Approve</button>
+          <button class="btn-danger flex-1" data-reject="${d.id}">Reject</button>
+        </div>
+      </div>`).join('') || emptyState('inbox','All caught up','No deposits awaiting review.')}
+    </div>`;
+  lucide.createIcons();
+  document.querySelectorAll('[data-approve]').forEach(el => el.addEventListener('click', async () => { await gs('adminApproveDeposit', TELEGRAM_ID, el.dataset.approve); renderDeposits(); }));
+  document.querySelectorAll('[data-reject]').forEach(el => el.addEventListener('click', async () => { await gs('adminRejectDeposit', TELEGRAM_ID, el.dataset.reject); renderDeposits(); }));
+}
+
+// ================= WITHDRAWALS =================
+async function renderWithdrawals() {
+  const withdrawals = await gs('getPendingWithdrawals', TELEGRAM_ID);
+  document.getElementById('screen').innerHTML =
+    screenHeader('Pending withdrawals') +
+    `<div class="flex flex-col gap-2">
+      ${withdrawals.map(w => `
+      <div class="glass p-3.5">
+        <div class="flex justify-between items-center"><span class="text-sm font-medium">$${Number(w.amount).toFixed(2)}</span><span class="muted text-[11px]">${fmtDate(w.createdAt)}</span></div>
+        <p class="muted text-xs mt-1">Telegram ${w.telegramId}</p>
+        <div class="flex gap-2 mt-3">
+          <button class="btn-primary flex-1 py-2 text-sm" data-wapprove="${w.id}">Mark paid</button>
+          <button class="btn-danger flex-1" data-wreject="${w.id}">Reject</button>
+        </div>
+      </div>`).join('') || emptyState('arrow-up-from-line','All caught up','No withdrawals pending.')}
+    </div>`;
+  lucide.createIcons();
+  document.querySelectorAll('[data-wapprove]').forEach(el => el.addEventListener('click', async () => { await gs('adminDecideWithdrawal', TELEGRAM_ID, el.dataset.wapprove, true); renderWithdrawals(); }));
+  document.querySelectorAll('[data-wreject]').forEach(el => el.addEventListener('click', async () => { await gs('adminDecideWithdrawal', TELEGRAM_ID, el.dataset.wreject, false); renderWithdrawals(); }));
+}
+
+// ================= AFFILIATES =================
+async function renderAffiliates() {
+  const affiliates = await gs('adminGetAffiliates', TELEGRAM_ID);
+  document.getElementById('screen').innerHTML =
+    screenHeader('Affiliates') +
+    `<div class="flex flex-col gap-2">
+      ${affiliates.map(a => `
+      <div class="glass p-3.5">
+        <div class="flex justify-between items-center"><span class="text-sm font-medium">Telegram ${a.telegramId}</span><span class="chip" style="color:var(--gold);background:var(--gold-dim)">${a.tier}</span></div>
+        <p class="muted text-xs mt-1">${a.totalReferrals} referrals · Ref: ${a.refCode}</p>
+        <p class="text-sm mt-1">Pending: <span style="color:var(--mint)">$${Number(a.pendingEarnings||0).toFixed(2)}</span> · Paid: $${Number(a.paidEarnings||0).toFixed(2)}</p>
+        ${a.accountNumber ? `<p class="muted text-[11px] mt-1">Bank: ${escapeHtml(a.bankCode)} · ${escapeHtml(a.accountNumber)} · ${escapeHtml(a.accountName)}</p>` : `<p class="muted text-[11px] mt-1">No payout bank details saved</p>`}
+        <div class="flex gap-2 mt-3">
+          <input type="number" placeholder="Amount to settle" class="text-sm" id="settle_${a.id}">
+          <button class="btn-ghost px-3 text-sm" data-settle="${a.id}">Manual</button>
+          ${isSuper() ? `<button class="btn-primary px-3 text-sm" data-settle-auto="${a.id}">Auto pay</button>` : ''}
+        </div>
+      </div>`).join('') || emptyState('share-2','No affiliates yet','Affiliates appear once users open the app.')}
+    </div>`;
+  lucide.createIcons();
+  document.querySelectorAll('[data-settle]').forEach(el => el.addEventListener('click', async () => {
+    const amount = document.getElementById('settle_' + el.dataset.settle).value;
+    if (!amount) return;
+    await gs('adminSettlePayout', TELEGRAM_ID, el.dataset.settle, amount);
+    renderAffiliates();
+  }));
+  document.querySelectorAll('[data-settle-auto]').forEach(el => el.addEventListener('click', async () => {
+    const amount = document.getElementById('settle_' + el.dataset.settleAuto).value;
+    if (!amount) return;
+    try { await gs('adminSettlePayoutAutomated', TELEGRAM_ID, el.dataset.settleAuto, amount); renderAffiliates(); }
+    catch (err) { alert(err.message); }
+  }));
+}
+
+// ================= FLAGS =================
+async function renderFlags() {
+  const flags = await gs('adminGetFlags', TELEGRAM_ID);
+  document.getElementById('screen').innerHTML =
+    screenHeader('Fraud flags') +
+    `<div class="flex flex-col gap-2">
+      ${flags.map(f => `
+      <div class="glass p-3.5" style="opacity:${f.reviewed===true||f.reviewed==='TRUE'?'0.5':'1'}">
+        <div class="flex justify-between items-center"><span class="chip" style="color:var(--rose);background:var(--rose-dim)">${escapeHtml(f.type)}</span><span class="muted text-[11px]">${fmtDate(f.createdAt)}</span></div>
+        <p class="text-sm mt-2">Telegram ${f.telegramId}${f.relatedTelegramId ? ' · related ' + f.relatedTelegramId : ''}</p>
+        <p class="muted text-xs mt-1">${escapeHtml(f.details)}</p>
+        ${f.reviewed!==true && f.reviewed!=='TRUE' ? `<button class="btn-ghost text-xs px-3 py-1.5 mt-2" data-review="${f.id}">Mark reviewed</button>` : ''}
+      </div>`).join('') || emptyState('shield-check','No flags','Nothing suspicious detected.')}
+    </div>`;
+  lucide.createIcons();
+  document.querySelectorAll('[data-review]').forEach(el => el.addEventListener('click', async () => { await gs('adminMarkFlagReviewed', TELEGRAM_ID, el.dataset.review); renderFlags(); }));
+}
+
+// ================= MORE (audit log + admins) =================
+async function renderMore() {
+  document.getElementById('screen').innerHTML = screenHeader('More') + `
+    <div class="flex flex-col gap-2 mb-6">
+      <button id="auditBtn" class="glass p-3.5 text-left flex justify-between items-center"><span class="text-sm font-medium">Audit log</span><i data-lucide="chevron-right" class="w-4 h-4 muted"></i></button>
+      ${isSuper() ? `<button id="adminsBtn" class="glass p-3.5 text-left flex justify-between items-center"><span class="text-sm font-medium">Manage admins</span><i data-lucide="chevron-right" class="w-4 h-4 muted"></i></button>` : ''}
+      ${isSuper() ? `<button id="settingsBtn" class="glass p-3.5 text-left flex justify-between items-center"><span class="text-sm font-medium">Platform settings</span><i data-lucide="chevron-right" class="w-4 h-4 muted"></i></button>` : ''}
+    </div>
+    <p class="muted text-[11px]">Admin access has no password — it's granted by adding a Telegram ID to the Admins sheet. Anyone on that list who opens this URL from their own Telegram account gets in.</p>`;
+  lucide.createIcons();
+  document.getElementById('auditBtn').addEventListener('click', renderAuditLog);
+  const adminsBtn = document.getElementById('adminsBtn');
+  if (adminsBtn) adminsBtn.addEventListener('click', renderAdmins);
+  const settingsBtn = document.getElementById('settingsBtn');
+  if (settingsBtn) settingsBtn.addEventListener('click', renderSettings);
+}
+
+// ================= SETTINGS =================
+async function renderSettings() {
+  const { settings, secretsStatus, spreadsheetUrl } = await gs('adminGetSettings', TELEGRAM_ID);
+  document.getElementById('screen').innerHTML = `
+    <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> More</button>
+    <h1 class="text-xl font-semibold mb-1">Platform settings</h1>
+    <p class="muted text-xs mb-4">Everything here is editable from this screen — no code or Script Properties editing needed.</p>
+    ${spreadsheetUrl ? `<a href="${escapeAttr(spreadsheetUrl)}" target="_blank" class="glass p-3 flex justify-between items-center text-sm mb-4"><span class="muted">Database (Google Sheet)</span><span style="color:var(--gold)">Open ↗</span></a>` : ''}
+
+    <form id="settingsForm" class="flex flex-col gap-4 mb-6">
+      <div class="glass p-4 flex flex-col gap-3">
+        <p class="text-xs font-semibold" style="color:var(--gold)">General</p>
+        <div><label class="field-label">Telegram bot username (no @)</label><input name="botUsername" value="${escapeAttr(settings.botUsername)}" placeholder="AtlasTradeAI_bot"></div>
+        <div><label class="field-label">Flutterwave public key</label><input name="flutterwavePublicKey" value="${escapeAttr(settings.flutterwavePublicKey)}" placeholder="FLWPUBK-..."></div>
+        <p class="muted text-[11px] -mt-1">Safe to store here (unlike the secret key below) — it's the publishable key Flutterwave's own checkout widget expects to see in the browser.</p>
+        <div><label class="field-label">Flutterwave-supported country codes</label><input name="flutterwaveCountries" value="${escapeAttr(settings.flutterwaveCountries.join(','))}" placeholder="NG,GH,KE,ZA"></div>
+      </div>
+      <div class="glass p-4 flex flex-col gap-3">
+        <p class="text-xs font-semibold" style="color:var(--gold)">Affiliate commissions</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="field-label">Direct commission (%)</label><input type="number" name="directCommissionPct" value="${settings.directCommissionPct}"></div>
+          <div><label class="field-label">Upline commission (%)</label><input type="number" name="uplineCommissionPct" value="${settings.uplineCommissionPct}"></div>
+          <div><label class="field-label">Payout threshold ($)</label><input type="number" name="payoutThreshold" value="${settings.payoutThreshold}"></div>
+        </div>
+      </div>
+      <div class="glass p-4 flex flex-col gap-3">
+        <p class="text-xs font-semibold" style="color:var(--gold)">Affiliate tiers</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="field-label">Silver at (referrals)</label><input type="number" name="silverReferralThreshold" value="${settings.silverReferralThreshold}"></div>
+          <div><label class="field-label">Silver bonus (%)</label><input type="number" name="silverBonusPct" value="${settings.silverBonusPct}"></div>
+          <div><label class="field-label">Gold at (referrals)</label><input type="number" name="goldReferralThreshold" value="${settings.goldReferralThreshold}"></div>
+          <div><label class="field-label">Gold bonus (%)</label><input type="number" name="goldBonusPct" value="${settings.goldBonusPct}"></div>
+        </div>
+      </div>
+      <div class="glass p-4 flex flex-col gap-3">
+        <p class="text-xs font-semibold" style="color:var(--gold)">Currency conversion</p>
+        <p class="muted text-[11px]">Local-currency deposits are converted from USD using a daily-cached rate pulled from TradingView, plus your markup below. If that fetch ever fails, whatever fallback rate you've set below (in the Live FX rate cache section) is used instead — it's stored in that same list, not here.</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="field-label">Markup on FX rate (%)</label><input type="number" name="fxMarkupPct" value="${settings.fxMarkupPct}"></div>
+          <div><label class="field-label">Cache duration (hours)</label><input type="number" name="fxCacheHours" value="${settings.fxCacheHours}"></div>
+        </div>
+      </div>
+      <div class="glass p-4 flex flex-col gap-3">
+        <p class="text-xs font-semibold" style="color:var(--gold)">Fraud detection</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="field-label">Velocity window (min)</label><input type="number" name="referralVelocityWindowMin" value="${settings.referralVelocityWindowMin}"></div>
+          <div><label class="field-label">Flag after N referrals</label><input type="number" name="referralVelocityThreshold" value="${settings.referralVelocityThreshold}"></div>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary w-full">Save settings</button>
+      <p id="settingsMsg" class="text-sm text-center"></p>
+    </form>
+
+    <div class="glass p-4 flex flex-col gap-3 mb-6">
+      <div class="flex justify-between items-center">
+        <p class="text-xs font-semibold" style="color:var(--gold)">Live FX rate cache</p>
+        <button id="refreshFxBtn" class="btn-ghost text-xs px-3 py-1.5">Refresh now</button>
+      </div>
+      <p class="muted text-[11px]">One row per currency, shared by TradingView's live rate and your manual fallback — whichever was set most recently is what's used. Setting a fallback below overwrites that currency's row here.</p>
+      <div id="fxRatesList" class="flex flex-col gap-1.5"></div>
+      <div class="flex gap-2 items-end pt-1">
+        <div class="flex-1"><label class="field-label">Currency</label><input id="fxFallbackCurrency" placeholder="NGN"></div>
+        <div class="flex-1"><label class="field-label">Fallback rate (1 USD = ?)</label><input id="fxFallbackRate" type="number" step="any" placeholder="1650"></div>
+        <button id="setFxFallbackBtn" class="btn-ghost text-xs px-3 py-2">Set fallback</button>
+      </div>
+      <p id="fxFallbackMsg" class="text-sm text-center"></p>
+    </div>
+
+    <div class="glass p-4 flex flex-col gap-3">
+      <p class="text-xs font-semibold" style="color:var(--gold)">API keys & tokens</p>
+      <p class="muted text-[11px]">Stored securely server-side, never shown again once saved. Leave a field blank to keep the current value.</p>
+      <div>
+        <label class="field-label">Telegram bot token ${secretsStatus.TELEGRAM_BOT_TOKEN ? '· <span style="color:var(--mint)">configured</span>' : '· <span style="color:var(--rose)">not set</span>'}</label>
+        <input id="tgToken" type="password" placeholder="123456:ABC-...">
+      </div>
+      <div>
+        <label class="field-label">Flutterwave secret key ${secretsStatus.FLW_SECRET_KEY ? '· <span style="color:var(--mint)">configured</span>' : '· <span style="color:var(--rose)">not set</span>'}</label>
+        <input id="flwSecret" type="password" placeholder="FLWSECK-...">
+      </div>
+      <div>
+        <label class="field-label">Flutterwave webhook hash ${secretsStatus.FLW_WEBHOOK_HASH ? '· <span style="color:var(--mint)">configured</span>' : '· <span style="color:var(--rose)">not set</span>'}</label>
+        <input id="flwHash" type="password" placeholder="Matches your Flutterwave dashboard webhook secret">
+      </div>
+      <button id="saveSecretsBtn" class="btn-primary w-full">Save keys</button>
+      <p id="secretsMsg" class="text-sm text-center"></p>
+    </div>
+  `;
+  lucide.createIcons();
+  document.getElementById('backBtn').addEventListener('click', renderMore);
+  loadFxRatesList();
+  document.getElementById('refreshFxBtn').addEventListener('click', async () => {
+    const listEl = document.getElementById('fxRatesList');
+    listEl.innerHTML = `<p class="muted text-xs">Refreshing…</p>`;
+    try { await gs('adminRefreshFxRates', TELEGRAM_ID); loadFxRatesList(); }
+    catch (err) { listEl.innerHTML = `<p class="text-xs" style="color:var(--rose)">${err.message}</p>`; }
+  });
+  document.getElementById('setFxFallbackBtn').addEventListener('click', async () => {
+    const msgEl = document.getElementById('fxFallbackMsg');
+    const currency = document.getElementById('fxFallbackCurrency').value;
+    const rate = document.getElementById('fxFallbackRate').value;
+    try {
+      await gs('adminSetFxFallbackRate', TELEGRAM_ID, currency, rate);
+      msgEl.style.color = 'var(--mint)'; msgEl.textContent = 'Saved.';
+      document.getElementById('fxFallbackCurrency').value = '';
+      document.getElementById('fxFallbackRate').value = '';
+      loadFxRatesList();
+    } catch (err) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = err.message; }
+  });
+  document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const payload = Object.fromEntries(fd.entries());
+    const msgEl = document.getElementById('settingsMsg');
+    try { await gs('adminSaveSettings', TELEGRAM_ID, payload); msgEl.style.color = 'var(--mint)'; msgEl.textContent = 'Saved.'; }
+    catch (err) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = err.message; }
+  });
+  document.getElementById('saveSecretsBtn').addEventListener('click', async () => {
+    const msgEl = document.getElementById('secretsMsg');
+    try {
+      await gs('adminSaveSecrets', TELEGRAM_ID, {
+        TELEGRAM_BOT_TOKEN: document.getElementById('tgToken').value,
+        FLW_SECRET_KEY: document.getElementById('flwSecret').value,
+        FLW_WEBHOOK_HASH: document.getElementById('flwHash').value
+      });
+      msgEl.style.color = 'var(--mint)'; msgEl.textContent = 'Saved.';
+      setTimeout(renderSettings, 800);
+    } catch (err) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = err.message; }
+  });
+}
+
+async function renderAuditLog() {
+  const logs = await gs('adminGetAuditLog', TELEGRAM_ID);
+  document.getElementById('screen').innerHTML = `
+    <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> More</button>
+    ${screenHeader('Audit log')}
+    <div class="flex flex-col gap-2">
+      ${logs.map(l => `<div class="glass p-3 text-sm"><div class="flex justify-between"><span class="font-medium">${escapeHtml(l.action)}</span><span class="muted text-[11px]">${fmtDate(l.createdAt)}</span></div><p class="muted text-xs mt-1">Admin ${l.adminTelegramId} · ${escapeHtml(l.targetType)} ${escapeHtml(l.targetId)}</p></div>`).join('') || emptyState('history','No activity yet','Admin actions will appear here.')}
+    </div>`;
+  lucide.createIcons();
+  document.getElementById('backBtn').addEventListener('click', renderMore);
+}
+
+async function renderAdmins() {
+  const admins = await gs('adminListAdmins', TELEGRAM_ID);
+  document.getElementById('screen').innerHTML = `
+    <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> More</button>
+    ${screenHeader('Admins')}
+    <div class="flex flex-col gap-2 mb-4">
+      ${admins.map(a => `<div class="glass p-3 flex justify-between items-center text-sm"><span>${escapeHtml(a.name)||a.telegramId}</span><span class="chip" style="color:var(--gold);background:var(--gold-dim)">${a.role}</span></div>`).join('')}
+    </div>
+    <div class="glass p-4 flex flex-col gap-3">
+      <p class="text-xs font-semibold" style="color:var(--gold)">Add admin</p>
+      <input id="newAdminId" placeholder="Telegram ID"><input id="newAdminName" placeholder="Name">
+      <select id="newAdminRole"><option value="support">Support (approve deposits/withdrawals)</option><option value="super">Super (full access)</option></select>
+      <button id="addAdminBtn" class="btn-primary w-full">Add</button>
+      <p id="addAdminMsg" class="text-sm text-center"></p>
+    </div>`;
+  lucide.createIcons();
+  document.getElementById('backBtn').addEventListener('click', renderMore);
+  document.getElementById('addAdminBtn').addEventListener('click', async () => {
+    const msgEl = document.getElementById('addAdminMsg');
+    try {
+      await gs('adminAddAdmin', TELEGRAM_ID, document.getElementById('newAdminId').value, document.getElementById('newAdminName').value, document.getElementById('newAdminRole').value);
+      msgEl.style.color = 'var(--mint)'; msgEl.textContent = 'Added.';
+      setTimeout(renderAdmins, 800);
+    } catch (err) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = err.message; }
+  });
+}
+
+async function loadFxRatesList() {
+  const listEl = document.getElementById('fxRatesList');
+  if (!listEl) return;
+  const rates = await gs('adminGetFxRates', TELEGRAM_ID);
+  listEl.innerHTML = rates.map(r => `
+    <div class="flex justify-between text-xs">
+      <span class="muted">1 USD = ${r.currency}</span>
+      <span>${Number(r.rate).toLocaleString()} <span class="muted">· ${escapeHtml(r.source)}</span></span>
+    </div>`).join('') || `<p class="muted text-xs">No rates cached yet — they'll populate as deposits happen, or hit Refresh now.</p>`;
+}
+
+// ---- utils ----
+function escapeHtml(str) { return String(str ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function escapeAttr(str) { return escapeHtml(str); }
+function fmtDate(iso) { if (!iso) return '—'; return new Date(iso).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }); }
+function toLocalInput(iso) { if (!iso) return ''; const d = new Date(iso); const pad = n => String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function emptyState(icon, title, sub) { return `<div class="glass p-6 flex flex-col items-center text-center gap-2"><i data-lucide="${icon}" class="w-6 h-6 muted"></i><p class="font-medium text-sm">${title}</p><p class="muted text-xs">${sub}</p></div>`; }
+
+function mockBackend(fnName, args) {
+  if (fnName === 'isAdmin') return true;
+  if (fnName === 'getAdminRole') return 'super';
+  if (fnName === 'getBots') return [{ id:'demo1', name:'Momentum FX Alpha', tvSymbol:'FX:EURUSD', riskLevel:'Medium', minDeposit:50, maxDeposit:5000, status:'Active', waitlistEnabled:true }];
+  if (fnName === 'getTrades') return [];
+  if (fnName === 'getPendingDeposits') return [];
+  if (fnName === 'getPendingWithdrawals') return [];
+  if (fnName === 'adminGetAffiliates') return [];
+  if (fnName === 'adminGetFlags') return [];
+  if (fnName === 'adminGetAuditLog') return [];
+  if (fnName === 'adminListAdmins') return [{ telegramId: TELEGRAM_ID, name:'You', role:'super' }];
+  if (fnName === 'adminGetStats') return { totalAUM:0, activeUsers:0, pendingDeposits:0, pendingWithdrawals:0, pendingPayouts:0, openFlags:0 };
+  if (fnName === 'adminGetWaitlist') return [];
+  if (fnName === 'adminGetSettings') return {
+    spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/mock/edit',
+    settings: { botUsername:'AtlasTradeAI_bot', flutterwavePublicKey:'', flutterwaveCountries:['NG','GH','KE','ZA','UG','TZ','RW','ZM','CI','SN','CM'], directCommissionPct:15, uplineCommissionPct:3, payoutThreshold:20, silverReferralThreshold:5, silverBonusPct:2, goldReferralThreshold:20, goldBonusPct:5, referralVelocityWindowMin:60, referralVelocityThreshold:5, fxMarkupPct:2, fxCacheHours:24 },
+    secretsStatus: { TELEGRAM_BOT_TOKEN:false, FLW_SECRET_KEY:false, FLW_WEBHOOK_HASH:false }
+  };
+  if (fnName === 'adminGetFxRates') return [{ currency:'NGN', rate:1650, source:'admin_fallback', fetchedAt:new Date().toISOString() }];
+  if (fnName === 'adminRefreshFxRates') return [];
+  if (fnName === 'adminSetFxFallbackRate') return [{ currency:'NGN', rate:1650, source:'admin_fallback', fetchedAt:new Date().toISOString() }];
+  if (fnName === 'adminSaveSettings' || fnName === 'adminSaveSecrets') return true;
+  return {};
+}
+
+boot();
+</script>
+</body>
+</html>

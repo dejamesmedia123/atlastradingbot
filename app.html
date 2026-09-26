@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AtlasTradeAI</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://checkout.flutterwave.com/v3.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0E14; --surface:rgba(255,255,255,0.045); --surface-strong:rgba(255,255,255,0.08);
+    --border:rgba(255,255,255,0.09); --text:#E8EDF2; --muted:#8B96A5;
+    --mint:#2DD9A8; --mint-dim:rgba(45,217,168,0.14);
+    --gold:#F0B429; --gold-dim:rgba(240,180,41,0.14);
+    --rose:#FB7185; --rose-dim:rgba(251,113,133,0.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;
+    padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(45,217,168,0.10), transparent 40%),
+      radial-gradient(circle at 85% 15%, rgba(240,180,41,0.07), transparent 40%);
+    background-attachment:fixed;
+  }
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+  .glass{ background:var(--surface); border:1px solid var(--border); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border-radius:18px; }
+  .glass-strong{ background:var(--surface-strong); border:1px solid var(--border); backdrop-filter:blur(18px); border-radius:18px; }
+  .muted{color:var(--muted);}
+  ::-webkit-scrollbar{display:none;}
+  .btn-primary{ background:var(--mint); color:#08110D; font-weight:600; border-radius:14px; padding:13px 18px; transition:transform .15s ease, opacity .15s ease; }
+  .btn-primary:active{transform:scale(0.97); opacity:0.9;}
+  .btn-primary:disabled{opacity:0.4;}
+  .btn-ghost{ background:var(--surface-strong); border:1px solid var(--border); color:var(--text); border-radius:14px; padding:13px 18px; }
+  .chip{border-radius:999px; padding:4px 11px; font-size:12px; font-weight:600;}
+  .pulse{animation:pulse 1.6s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  input, select{
+    background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--text);
+    border-radius:12px; padding:12px 14px; width:100%; font-family:'Inter',sans-serif;
+  }
+  input::placeholder{color:var(--muted);}
+  input:focus, select:focus{outline:none; border-color:var(--mint);}
+</style>
+</head>
+<body>
+
+<div id="app" class="max-w-md mx-auto min-h-screen flex flex-col pb-24">
+  <div id="screen" class="flex-1 px-4 pt-5"></div>
+
+  <nav id="bottomNav" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto px-4" style="padding-bottom:calc(env(safe-area-inset-bottom,0px) + 10px)">
+    <div class="glass-strong flex justify-around items-center py-2.5 mt-3">
+      <button data-tab="home" class="nav-btn flex flex-col items-center gap-1 px-3 py-1">
+        <i data-lucide="layout-grid" class="tab-icon w-5 h-5"></i><span class="text-[11px]">Bots</span>
+      </button>
+      <button data-tab="dashboard" class="nav-btn flex flex-col items-center gap-1 px-3 py-1">
+        <i data-lucide="wallet" class="tab-icon w-5 h-5"></i><span class="text-[11px]">Portfolio</span>
+      </button>
+      <button data-tab="affiliate" class="nav-btn flex flex-col items-center gap-1 px-3 py-1">
+        <i data-lucide="share-2" class="tab-icon w-5 h-5"></i><span class="text-[11px]">Affiliate</span>
+      </button>
+      <button data-tab="profile" class="nav-btn flex flex-col items-center gap-1 px-3 py-1">
+        <i data-lucide="user" class="tab-icon w-5 h-5"></i><span class="text-[11px]">Profile</span>
+      </button>
+    </div>
+  </nav>
+</div>
+
+<script>
+const tg = window.Telegram ? window.Telegram.WebApp : null;
+if (tg) { tg.ready(); tg.expand(); }
+
+const tgUser = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) || { id: 'demo_' + Math.floor(Math.random()*100000), first_name: 'Guest', username: 'guest' };
+const startParam = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
+const TELEGRAM_ID = String(tgUser.id);
+
+let STATE = { user: null, bots: [], currentTab: 'home', selectedBotId: null, publicSettings: { botUsername: '', flutterwaveCountries: [] } };
+
+// Backend is now a static-friendly Google Apps Script JSON API (no more google.script.run,
+// since this page is hosted on GitHub Pages, not served by Apps Script). Set this to your
+// deployment's /exec URL.
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx40Xn2jCWizJDV99DB5x2UXz56G9xPQYDXPj9J6p2OmS2eXCkrZmw95IPKAQFTWq49xg/exec';
+
+function gs(fnName, ...args) {
+  return new Promise((resolve) => {
+    if (!SCRIPT_URL) {
+      console.warn('preview mode (no SCRIPT_URL set):', fnName, args);
+      resolve(mockBackend(fnName, args));
+      return;
+    }
+    // Sent as a plain-text body (not application/json) so the browser treats this as a
+    // "simple request" and skips the CORS preflight OPTIONS call Apps Script can't answer.
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ fn: fnName, args }) })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.ok) resolve(data.result);
+        else { console.error('Backend error for', fnName, data && data.error); resolve(mockBackend(fnName, args)); }
+      })
+      .catch(err => {
+        console.error('Network error calling backend, falling back to preview mode:', fnName, err);
+        resolve(mockBackend(fnName, args));
+      });
+  });
+}
+
+async function boot() {
+  lucide.createIcons();
+  renderLoading();
+  STATE.user = await gs('getOrCreateUser', {
+    telegramId: TELEGRAM_ID,
+    name: [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' '),
+    username: tgUser.username || '', country: '',
+    referredBy: startParam || ''
+  });
+  STATE.publicSettings = await gs('getPublicSettings');
+  if (!STATE.user.tosAcceptedAt) return renderTermsGate();
+  STATE.bots = await gs('getBots');
+  document.getElementById('bottomNav').classList.remove('hidden');
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => goTab(btn.dataset.tab)));
+  goTab('home');
+}
+
+function renderLoading() {
+  document.getElementById('bottomNav').classList.add('hidden');
+  document.getElementById('screen').innerHTML = `
+    <div class="pt-24 flex flex-col items-center gap-3">
+      <div class="w-10 h-10 rounded-full glass-strong flex items-center justify-center pulse">
+        <i data-lucide="atom" class="w-5 h-5" style="color:var(--mint)"></i>
+      </div>
+      <p class="muted text-sm">Loading AtlasTradeAI…</p>
+    </div>`;
+  lucide.createIcons();
+}
+
+function renderTermsGate() {
+  document.getElementById('bottomNav').classList.add('hidden');
+  document.getElementById('screen').innerHTML = `
+    <div class="pt-10">
+      <h1 class="text-xl font-semibold mb-2">Before you start</h1>
+      <div class="glass p-4 mb-4 text-sm leading-relaxed" style="color:#C6CFD9; max-height:50vh; overflow-y:auto;">
+        <p class="mb-2">Trading carries risk, including loss of principal. AtlasTradeAI bots trade on your behalf within the parameters shown per bot; past performance does not guarantee future results.</p>
+        <p class="mb-2">Deposits are allocated to the bot you choose and are subject to that bot's minimum, maximum, and withdrawal lock terms. Profit share and fees are disclosed on each bot's page before you deposit.</p>
+        <p>By continuing you confirm you understand these risks and agree to be bound by these terms.</p>
+      </div>
+      <button id="acceptBtn" class="btn-primary w-full">I understand and agree</button>
+    </div>`;
+  document.getElementById('acceptBtn').addEventListener('click', async () => {
+    STATE.user = await gs('acceptTerms', TELEGRAM_ID);
+    STATE.bots = await gs('getBots');
+    document.getElementById('bottomNav').classList.remove('hidden');
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => goTab(btn.dataset.tab)));
+    goTab('home');
+  });
+}
+
+function setActiveNav(tab) {
+  document.querySelectorAll('.nav-btn').forEach(b => { b.style.color = b.dataset.tab === tab ? 'var(--mint)' : 'var(--muted)'; });
+}
+
+async function goTab(tab) {
+  STATE.currentTab = tab;
+  setActiveNav(tab);
+  if (tab === 'home') return renderHome();
+  if (tab === 'dashboard') return renderDashboard();
+  if (tab === 'affiliate') return renderAffiliate();
+  if (tab === 'profile') return renderProfile();
+}
+
+// ---- HOME ----
+function renderHome() {
+  const bots = STATE.bots;
+  document.getElementById('screen').innerHTML = `
+    <header class="mb-5">
+      <p class="muted text-sm">Welcome back</p>
+      <h1 class="text-2xl font-semibold">${escapeHtml(STATE.user.name || 'Trader')}</h1>
+    </header>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-base font-semibold">Trading bots</h2>
+      <span class="muted text-xs">${bots.length} available</span>
+    </div>
+    <div class="flex flex-col gap-3">${bots.map(botCard).join('') || emptyState('inbox', 'No bots yet', 'Check back soon.')}</div>`;
+  lucide.createIcons();
+  document.querySelectorAll('[data-open-bot]').forEach(el => el.addEventListener('click', () => openBot(el.dataset.openBot)));
+}
+
+function botCard(bot) {
+  const risk = bot.riskLevel || 'Medium';
+  const riskColor = risk === 'Low' ? 'var(--mint)' : risk === 'High' ? 'var(--rose)' : 'var(--gold)';
+  const riskBg = risk === 'Low' ? 'var(--mint-dim)' : risk === 'High' ? 'var(--rose-dim)' : 'var(--gold-dim)';
+  return `
+  <div class="glass p-4" data-open-bot="${bot.id}">
+    <div class="flex justify-between items-start">
+      <div><h3 class="font-semibold text-[15px]">${escapeHtml(bot.name)}</h3><p class="muted text-xs mt-0.5">${escapeHtml(bot.assetClass || bot.tvSymbol || '')}</p></div>
+      <span class="chip" style="color:${riskColor};background:${riskBg}">${risk} risk</span>
+    </div>
+    <p class="text-sm mt-3 leading-snug" style="color:#C6CFD9">${escapeHtml((bot.description||'').slice(0,90))}${(bot.description||'').length>90?'…':''}</p>
+    <div class="flex justify-between items-center mt-4 pt-3" style="border-top:1px solid var(--border)">
+      <span class="text-xs muted">Deposit: <span style="color:var(--text)">$${bot.minDeposit||0}–$${bot.maxDeposit||'—'}</span></span>
+      <span class="flex items-center gap-1 text-xs font-medium" style="color:var(--mint)">View <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+    </div>
+  </div>`;
+}
+
+// ---- BOT DETAIL ----
+async function openBot(botId) {
+  STATE.selectedBotId = botId;
+  const bot = STATE.bots.find(b => String(b.id) === String(botId));
+  document.getElementById('screen').innerHTML = `<div class="pt-16 text-center muted text-sm">Loading bot…</div>`;
+  const trades = await gs('getTrades', botId);
+  renderBotDetail(bot, trades);
+}
+
+function renderBotDetail(bot, trades) {
+  const totalProfit = trades.reduce((s,t) => s + Number(t.profitPct||0), 0);
+  document.getElementById('screen').innerHTML = `
+    <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> Bots</button>
+    <div class="glass p-4 mb-4">
+      <div class="flex justify-between items-start">
+        <div><h1 class="text-xl font-semibold">${escapeHtml(bot.name)}</h1><p class="muted text-sm mt-0.5">${escapeHtml(bot.tvSymbol || '')}</p></div>
+        <span class="chip" style="color:var(--mint);background:var(--mint-dim)">${totalProfit>=0?'+':''}${totalProfit.toFixed(2)}%</span>
+      </div>
+      <p class="text-sm mt-3 leading-snug" style="color:#C6CFD9">${escapeHtml(bot.description||'')}</p>
+    </div>
+    <div class="glass mb-4 overflow-hidden" style="height:280px"><div id="tv_chart" style="height:100%"></div></div>
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      ${statTile('Profit share', (bot.profitSharePct||0)+'%')}
+      ${statTile('Payout', bot.payoutFrequency||'—')}
+      ${statTile('Min deposit', '$'+(bot.minDeposit||0))}
+      ${statTile('Max deposit', bot.maxDeposit ? '$'+bot.maxDeposit : 'No cap')}
+    </div>
+    <button id="depositBtn" class="btn-primary w-full flex items-center justify-center gap-2 mb-6">
+      <i data-lucide="arrow-down-to-line" class="w-4 h-4"></i> Deposit into this bot
+    </button>
+    <h2 class="text-base font-semibold mb-3">Trade history</h2>
+    <div class="flex flex-col gap-2">${trades.map(tradeRow).join('') || emptyState('activity', 'No trades logged yet', 'The team will post trades here as they happen.')}</div>
+  `;
+  lucide.createIcons();
+  document.getElementById('backBtn').addEventListener('click', renderHome);
+  document.getElementById('depositBtn').addEventListener('click', () => renderDepositForm(bot));
+  loadTradingViewWidget(bot.tvSymbol || 'BINANCE:BTCUSDT');
+}
+
+function loadTradingViewWidget(symbol) {
+  const container = document.getElementById('tv_chart');
+  if (!container) return;
+  const script = document.createElement('script');
+  script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
+  script.async = true;
+  script.innerHTML = JSON.stringify({ symbols: [[symbol]], chartOnly: true, width: '100%', height: '100%', colorTheme: 'dark', isTransparent: true, autosize: true, noTimeScale: false });
+  container.appendChild(script);
+}
+
+function statTile(label, value) { return `<div class="glass p-3"><p class="muted text-[11px]">${label}</p><p class="font-semibold text-sm mt-1">${value}</p></div>`; }
+
+function tradeRow(t) {
+  const profit = Number(t.profitPct||0);
+  const positive = profit >= 0;
+  return `<div class="glass p-3 flex justify-between items-center">
+    <div><p class="text-sm font-medium">${escapeHtml(t.symbol)} · ${escapeHtml(t.side||'')}</p><p class="muted text-[11px] mt-0.5">${fmtDate(t.openedAt)}</p></div>
+    <span class="text-sm font-semibold" style="color:${positive?'var(--mint)':'var(--rose)'}">${positive?'+':''}${profit.toFixed(2)}%</span>
+  </div>`;
+}
+
+// ---- DEPOSIT FORM ----
+function renderDepositForm(bot) {
+  const recommended = getRecommendedMethodClientSide(STATE.user.country);
+  const currencies = (bot.currencies || 'NGN,USD').split(',').map(c => c.trim()).filter(Boolean);
+  document.getElementById('screen').innerHTML = `
+    <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> ${escapeHtml(bot.name)}</button>
+    <h1 class="text-xl font-semibold mb-1">Deposit</h1>
+    <p class="muted text-sm mb-5">Between $${bot.minDeposit} and $${bot.maxDeposit || '∞'}</p>
+
+    ${!STATE.user.country ? `
+    <div class="glass p-4 mb-4">
+      <label class="muted text-xs">Your country</label>
+      <input id="countryInput" type="text" placeholder="e.g. NG, GH, US" class="mt-1.5" maxlength="2" style="text-transform:uppercase" />
+      <p class="muted text-[11px] mt-2">We use this to recommend the right payment method.</p>
+    </div>` : ''}
+
+    <div class="glass p-4 mb-4">
+      <label class="muted text-xs">Amount (USD)</label>
+      <input id="amountInput" type="number" placeholder="e.g. 100" class="mt-1.5" />
+    </div>
+
+    <div class="glass p-4 mb-4">
+      <p class="muted text-xs mb-2">Payment method</p>
+      <div class="flex flex-col gap-2">
+        <label class="flex items-center gap-2 text-sm"><input type="radio" name="method" value="flutterwave" ${recommended==='flutterwave'?'checked':''} class="w-auto"> Flutterwave (supported countries)</label>
+        <label class="flex items-center gap-2 text-sm"><input type="radio" name="method" value="manual" ${recommended==='manual'?'checked':''} class="w-auto"> Manual (bank transfer / crypto)</label>
+      </div>
+    </div>
+
+    <div id="flwFields" class="glass p-4 mb-4 ${recommended==='flutterwave'?'':'hidden'}">
+      <label class="muted text-xs">Email (for your payment receipt)</label>
+      <input id="flwEmail" type="email" placeholder="you@example.com" class="mt-1.5" />
+      <label class="muted text-xs mt-3 block">Currency</label>
+      <select id="flwCurrency" class="mt-1.5">${currencies.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select>
+      <p id="fxPreview" class="muted text-[11px] mt-2"></p>
+    </div>
+
+    <div id="manualFields" class="glass p-4 mb-4 ${recommended==='manual'?'':'hidden'}">
+      <label class="muted text-xs">Proof / transaction reference</label>
+      <input id="proofInput" type="text" placeholder="Tx hash or bank reference" class="mt-1.5" />
+      <p class="muted text-[11px] mt-2">Your deposit will be marked pending until admin confirms it.</p>
+    </div>
+
+    <button id="submitDeposit" class="btn-primary w-full">Continue</button>
+    <p id="depositMsg" class="text-sm mt-3 text-center"></p>
+  `;
+  lucide.createIcons();
+  document.getElementById('backBtn').addEventListener('click', () => openBot(bot.id));
+  document.querySelectorAll('input[name=method]').forEach(r => r.addEventListener('change', e => {
+    document.getElementById('manualFields').classList.toggle('hidden', e.target.value !== 'manual');
+    document.getElementById('flwFields').classList.toggle('hidden', e.target.value !== 'flutterwave');
+  }));
+  const updateFxPreview = async () => {
+    const previewEl = document.getElementById('fxPreview');
+    const amt = Number(document.getElementById('amountInput').value);
+    const cur = document.getElementById('flwCurrency').value;
+    if (!amt) { previewEl.textContent = ''; return; }
+    if (cur === 'USD') { previewEl.textContent = 'Charged as $' + amt.toFixed(2) + '.'; return; }
+    previewEl.textContent = 'Calculating…';
+    try {
+      const conv = await gs('getConvertedDepositAmount', amt, cur);
+      previewEl.textContent = 'You\'ll be charged ≈ ' + conv.localAmount.toLocaleString() + ' ' + cur + ' (includes ' + conv.markupPct + '% fee).';
+    } catch (err) { previewEl.textContent = err.message; }
+  };
+  document.getElementById('amountInput').addEventListener('input', debounce(updateFxPreview, 500));
+  const flwCurrencyEl = document.getElementById('flwCurrency');
+  if (flwCurrencyEl) flwCurrencyEl.addEventListener('change', updateFxPreview);
+  document.getElementById('submitDeposit').addEventListener('click', async () => {
+    const amount = Number(document.getElementById('amountInput').value);
+    const method = document.querySelector('input[name=method]:checked').value;
+    const countryInput = document.getElementById('countryInput');
+    const msgEl = document.getElementById('depositMsg');
+    if (!amount) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = 'Enter an amount.'; return; }
+
+    if (countryInput && countryInput.value) {
+      try { STATE.user = await gs('updateUserCountry', TELEGRAM_ID, countryInput.value.toUpperCase()); }
+      catch (err) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = err.message; return; }
+    }
+
+    if (method === 'manual') {
+      const proof = document.getElementById('proofInput').value;
+      try {
+        await gs('createDeposit', { telegramId: TELEGRAM_ID, botId: bot.id, amount, currency: 'USD', method, proofUrl: proof });
+        msgEl.style.color = 'var(--mint)';
+        msgEl.textContent = 'Submitted — pending admin approval.';
+        setTimeout(() => openBot(bot.id), 1200);
+      } catch (err) {
+        const isWaitlist = /waitlist/i.test(err.message || '');
+        msgEl.style.color = isWaitlist ? 'var(--gold)' : 'var(--rose)';
+        msgEl.textContent = err.message || 'Something went wrong.';
+      }
+      return;
+    }
+
+    // Flutterwave path — real inline checkout, verified server-side before the deposit is confirmed.
+    const publicKey = STATE.publicSettings.flutterwavePublicKey;
+    if (!publicKey) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = 'Flutterwave isn\'t configured yet — ask the admin to add a public key in Settings.'; return; }
+    const email = document.getElementById('flwEmail').value;
+    if (!email) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = 'Enter an email for your receipt.'; return; }
+    const currency = document.getElementById('flwCurrency').value;
+    const txRef = 'atlas_dep_' + TELEGRAM_ID + '_' + Date.now();
+
+    msgEl.style.color = 'var(--text)'; msgEl.textContent = 'Preparing checkout…';
+    let conv;
+    try { conv = await gs('getConvertedDepositAmount', amount, currency); }
+    catch (err) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = err.message; return; }
+
+    msgEl.textContent = 'Opening secure checkout…';
+    FlutterwaveCheckout({
+      public_key: publicKey,
+      tx_ref: txRef,
+      amount: conv.localAmount,
+      currency: currency,
+      payment_options: 'card,banktransfer,ussd,mobilemoney',
+      customer: { email: email },
+      customizations: { title: 'AtlasTradeAI', description: 'Deposit into ' + bot.name, logo: '' },
+      callback: async function (response) {
+        msgEl.textContent = 'Verifying payment…';
+        try {
+          if (response.status !== 'successful' && response.status !== 'completed') throw new Error('Payment was not completed.');
+          await gs('confirmFlutterwaveDeposit', {
+            telegramId: TELEGRAM_ID, botId: bot.id, amount: amount, currency: currency,
+            localAmount: conv.localAmount, txRef: response.tx_ref || txRef
+          });
+          msgEl.style.color = 'var(--mint)'; msgEl.textContent = 'Deposit confirmed!';
+          setTimeout(() => openBot(bot.id), 1200);
+        } catch (err) {
+          msgEl.style.color = 'var(--rose)';
+          msgEl.textContent = err.message || 'We could not verify this payment — contact support with your reference: ' + txRef;
+        }
+      },
+      onclose: function () {
+        if (msgEl.textContent === 'Opening secure checkout…') { msgEl.textContent = ''; }
+      }
+    });
+  });
+}
+
+function getRecommendedMethodClientSide(country) {
+  const flw = STATE.publicSettings.flutterwaveCountries || [];
+  return flw.indexOf(String(country||'').toUpperCase()) !== -1 ? 'flutterwave' : 'manual';
+}
+
+// ---- DASHBOARD ----
+async function renderDashboard() {
+  document.getElementById('screen').innerHTML = `<div class="pt-16 text-center muted text-sm">Loading portfolio…</div>`;
+  const dash = await gs('getUserDashboard', TELEGRAM_ID);
+  STATE.dashboard = dash;
+  const totalBalance = dash.positions.reduce((s,p) => s + p.balance, 0);
+  document.getElementById('screen').innerHTML = `
+    <h1 class="text-xl font-semibold mb-4">Portfolio</h1>
+    <div class="glass-strong p-5 mb-5">
+      <p class="muted text-xs">Total balance across bots</p>
+      <p class="display text-3xl font-semibold mt-1" style="color:var(--mint)">$${totalBalance.toFixed(2)}</p>
+    </div>
+    <div class="flex flex-col gap-3">${dash.positions.map(positionCard).join('') || emptyState('piggy-bank', 'No active positions', 'Deposit into a bot to see it here.')}</div>`;
+  lucide.createIcons();
+  document.querySelectorAll('[data-withdraw-bot]').forEach(el => el.addEventListener('click', () => {
+    const p = dash.positions.find(p => String(p.botId) === el.dataset.withdrawBot);
+    renderWithdrawalForm(p);
+  }));
+}
+
+function positionCard(p) {
+  return `<div class="glass p-4">
+    <div class="flex justify-between items-center">
+      <h3 class="font-semibold text-sm">${escapeHtml(p.botName)}</h3>
+      <span class="text-sm font-semibold" style="color:${p.estProfitPct>=0?'var(--mint)':'var(--rose)'}">${p.estProfitPct>=0?'+':''}${p.estProfitPct.toFixed(2)}%</span>
+    </div>
+    <p class="text-xl font-semibold mt-2">$${p.balance.toFixed(2)}</p>
+    <p class="muted text-[11px] mt-1">${p.withdrawalUnlocked ? 'Withdrawal available' : 'Locked · ' + p.daysSinceDeposit + ' days in'}</p>
+    ${p.withdrawalUnlocked && p.balance > 0 ? `<button class="btn-ghost w-full mt-3 text-sm py-2" data-withdraw-bot="${p.botId}">Withdraw</button>` : ''}
+  </div>`;
+}
+
+// ---- WITHDRAWAL FORM (with OTP) ----
+function renderWithdrawalForm(position) {
+  document.getElementById('screen').innerHTML = `
+    <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> Portfolio</button>
+    <h1 class="text-xl font-semibold mb-1">Withdraw</h1>
+    <p class="muted text-sm mb-5">${escapeHtml(position.botName)} · available $${position.balance.toFixed(2)}</p>
+
+    <div class="glass p-4 mb-4">
+      <label class="muted text-xs">Amount (USD)</label>
+      <input id="wAmount" type="number" placeholder="e.g. 100" class="mt-1.5" />
+    </div>
+
+    <button id="sendOtpBtn" class="btn-ghost w-full mb-4">Send confirmation code</button>
+
+    <div id="otpSection" class="glass p-4 mb-4 hidden">
+      <label class="muted text-xs">Enter the 6-digit code sent via Telegram</label>
+      <input id="wOtp" type="text" placeholder="123456" maxlength="6" class="mt-1.5" />
+    </div>
+
+    <button id="submitWithdraw" class="btn-primary w-full" disabled>Confirm withdrawal</button>
+    <p id="wMsg" class="text-sm mt-3 text-center"></p>
+  `;
+  lucide.createIcons();
+  document.getElementById('backBtn').addEventListener('click', renderDashboard);
+  document.getElementById('sendOtpBtn').addEventListener('click', async () => {
+    const msgEl = document.getElementById('wMsg');
+    try {
+      await gs('requestWithdrawalOtp', TELEGRAM_ID);
+      document.getElementById('otpSection').classList.remove('hidden');
+      document.getElementById('submitWithdraw').disabled = false;
+      msgEl.style.color = 'var(--mint)'; msgEl.textContent = 'Code sent via Telegram.';
+    } catch (err) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = err.message; }
+  });
+  document.getElementById('submitWithdraw').addEventListener('click', async () => {
+    const amount = Number(document.getElementById('wAmount').value);
+    const otpCode = document.getElementById('wOtp').value;
+    const msgEl = document.getElementById('wMsg');
+    if (!amount) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = 'Enter an amount.'; return; }
+    try {
+      await gs('createWithdrawal', { telegramId: TELEGRAM_ID, botId: position.botId, amount, otpCode });
+      msgEl.style.color = 'var(--mint)'; msgEl.textContent = 'Withdrawal requested — pending admin payout.';
+      setTimeout(renderDashboard, 1200);
+    } catch (err) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = err.message; }
+  });
+}
+
+// ---- AFFILIATE ----
+async function renderAffiliate() {
+  document.getElementById('screen').innerHTML = `<div class="pt-16 text-center muted text-sm">Loading affiliate data…</div>`;
+  const data = await gs('getAffiliateStats', TELEGRAM_ID);
+  STATE.affiliate = data;
+  const botUsername = STATE.publicSettings.botUsername || 'YourBotUsername';
+  const link = 'https://t.me/' + botUsername + '?start=' + data.affiliate.refCode;
+  document.getElementById('screen').innerHTML = `
+    <h1 class="text-xl font-semibold mb-4">Affiliate</h1>
+    <div class="glass-strong p-5 mb-4">
+      <div class="flex justify-between items-center">
+        <span class="chip" style="color:var(--gold);background:var(--gold-dim)">${data.affiliate.tier} tier</span>
+        <span class="muted text-xs">${data.affiliate.totalReferrals} referrals</span>
+      </div>
+      <p class="muted text-xs mt-4">Pending earnings</p>
+      <p class="display text-2xl font-semibold" style="color:var(--mint)">$${Number(data.affiliate.pendingEarnings||0).toFixed(2)}</p>
+      <p class="muted text-[11px] mt-1">Paid to date: $${Number(data.affiliate.paidEarnings||0).toFixed(2)}</p>
+    </div>
+
+    <div class="glass p-4 mb-4">
+      <p class="muted text-xs mb-2">Your referral link</p>
+      <div class="flex items-center gap-2">
+        <input readonly value="${link}" class="text-xs" />
+        <button id="copyLink" class="btn-ghost px-3"><i data-lucide="copy" class="w-4 h-4"></i></button>
+      </div>
+    </div>
+
+    <button id="payoutBtn" class="btn-primary w-full mb-3">Request payout</button>
+    <button id="bankDetailsBtn" class="btn-ghost w-full mb-6">Payout bank details</button>
+    <p id="payoutMsg" class="text-sm text-center mb-4"></p>
+
+    <h2 class="text-base font-semibold mb-3">Referral activity</h2>
+    <div class="flex flex-col gap-2">
+      ${data.referrals.map(r => `
+        <div class="glass p-3 flex justify-between items-center">
+          <span class="text-sm">User •••${String(r.referredTelegramId).slice(-4)}</span>
+          <span class="text-sm font-semibold" style="color:var(--mint)">+$${Number(r.commissionAmount).toFixed(2)}</span>
+        </div>`).join('') || emptyState('users', 'No referrals yet', 'Share your link to start earning.')}
+    </div>
+  `;
+  lucide.createIcons();
+  document.getElementById('copyLink').addEventListener('click', () => {
+    navigator.clipboard.writeText(link);
+    if (tg) tg.HapticFeedback.notificationOccurred('success');
+  });
+  document.getElementById('payoutBtn').addEventListener('click', async () => {
+    const msgEl = document.getElementById('payoutMsg');
+    try { await gs('requestAffiliatePayout', TELEGRAM_ID); msgEl.style.color = 'var(--mint)'; msgEl.textContent = 'Payout requested — admin will settle shortly.'; }
+    catch (err) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = err.message; }
+  });
+  document.getElementById('bankDetailsBtn').addEventListener('click', () => renderBankDetailsForm(data.affiliate));
+}
+
+function renderBankDetailsForm(affiliate) {
+  document.getElementById('screen').innerHTML = `
+    <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> Affiliate</button>
+    <h1 class="text-xl font-semibold mb-4">Payout bank details</h1>
+    <div class="glass p-4 flex flex-col gap-3">
+      <div><label class="muted text-xs">Bank code</label><input id="bankCode" value="${escapeAttr(affiliate.bankCode)}" placeholder="e.g. 044" class="mt-1"/></div>
+      <div><label class="muted text-xs">Account number</label><input id="acctNum" value="${escapeAttr(affiliate.accountNumber)}" class="mt-1"/></div>
+      <div><label class="muted text-xs">Account name</label><input id="acctName" value="${escapeAttr(affiliate.accountName)}" class="mt-1"/></div>
+      <div><label class="muted text-xs">Country</label><input id="bankCountry" value="${escapeAttr(affiliate.bankCountry)}" placeholder="NG" maxlength="2" class="mt-1"/></div>
+      <button id="saveBank" class="btn-primary w-full mt-2">Save details</button>
+      <p id="bankMsg" class="text-sm text-center"></p>
+    </div>`;
+  lucide.createIcons();
+  document.getElementById('backBtn').addEventListener('click', renderAffiliate);
+  document.getElementById('saveBank').addEventListener('click', async () => {
+    const msgEl = document.getElementById('bankMsg');
+    try {
+      await gs('saveAffiliatePayoutDetails', TELEGRAM_ID, {
+        bankCode: document.getElementById('bankCode').value, accountNumber: document.getElementById('acctNum').value,
+        accountName: document.getElementById('acctName').value, bankCountry: document.getElementById('bankCountry').value
+      });
+      msgEl.style.color = 'var(--mint)'; msgEl.textContent = 'Saved.';
+    } catch (err) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = err.message; }
+  });
+}
+
+// ---- PROFILE ----
+function renderProfile() {
+  document.getElementById('screen').innerHTML = `
+    <h1 class="text-xl font-semibold mb-4">Profile</h1>
+    <div class="glass p-4 mb-4 flex items-center gap-3">
+      <div class="w-12 h-12 rounded-full flex items-center justify-center" style="background:var(--mint-dim)"><i data-lucide="user" class="w-5 h-5" style="color:var(--mint)"></i></div>
+      <div><p class="font-semibold text-sm">${escapeHtml(STATE.user.name || 'Trader')}</p><p class="muted text-xs">@${escapeHtml(STATE.user.username || 'unknown')}</p></div>
+    </div>
+    <div class="glass p-4 flex flex-col gap-3 text-sm mb-4">
+      <div class="flex justify-between"><span class="muted">Telegram ID</span><span>${TELEGRAM_ID}</span></div>
+      <div class="flex justify-between"><span class="muted">Country</span><span>${escapeHtml(STATE.user.country || 'Not set')}</span></div>
+      <div class="flex justify-between"><span class="muted">Member since</span><span>${fmtDate(STATE.user.createdAt)}</span></div>
+    </div>
+    <button id="statementBtn" class="btn-ghost w-full flex items-center justify-center gap-2">
+      <i data-lucide="download" class="w-4 h-4"></i> Download statement
+    </button>
+  `;
+  lucide.createIcons();
+  document.getElementById('statementBtn').addEventListener('click', async () => {
+    const csv = await gs('getUserStatementCsv', TELEGRAM_ID);
+    try {
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'atlastradeai-statement.csv'; a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(csv); // fallback if download isn't supported in this webview
+    }
+  });
+}
+
+// ---- utils ----
+function escapeHtml(str) { return String(str ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function escapeAttr(str) { return escapeHtml(str); }
+function debounce(fn, ms) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; }
+function fmtDate(iso) { if (!iso) return '—'; return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
+function emptyState(icon, title, sub) {
+  return `<div class="glass p-6 flex flex-col items-center text-center gap-2">
+    <i data-lucide="${icon}" class="w-6 h-6 muted"></i><p class="font-medium text-sm">${title}</p><p class="muted text-xs">${sub}</p>
+  </div>`;
+}
+
+// ---- mock backend for local preview only ----
+function mockBackend(fnName, args) {
+  const demoBots = [{ id:'demo1', name:'Momentum FX Alpha', description:'Trades major forex pairs using momentum breakout signals.', tvSymbol:'FX:EURUSD', riskLevel:'Medium', minDeposit:50, maxDeposit:5000, profitSharePct:20, payoutFrequency:'Weekly', assetClass:'Forex' }];
+  if (fnName === 'getPublicSettings') return { botUsername: 'AtlasTradeAI_bot', flutterwaveCountries: ['NG','GH','KE','ZA','UG','TZ','RW','ZM','CI','SN','CM'] };
+  if (fnName === 'getOrCreateUser') return { id:'u1', name: args[0].name, username: args[0].username, country:'', tosAcceptedAt: new Date().toISOString(), createdAt: new Date().toISOString() };
+  if (fnName === 'acceptTerms') return { tosAcceptedAt: new Date().toISOString() };
+  if (fnName === 'updateUserCountry') return { country: args[1] };
+  if (fnName === 'getBots') return demoBots;
+  if (fnName === 'getTrades') return [];
+  if (fnName === 'getUserDashboard') return { positions: [] };
+  if (fnName === 'getAffiliateStats') return { affiliate:{ refCode:'ref_DEMO123', tier:'Bronze', totalReferrals:0, pendingEarnings:0, paidEarnings:0 }, referrals:[] };
+  if (fnName === 'createDeposit') return {};
+  if (fnName === 'confirmFlutterwaveDeposit') return {};
+  if (fnName === 'getConvertedDepositAmount') return { localAmount: Number(args[0]) * (args[1]==='USD'?1:1500), rate: args[1]==='USD'?1:1500, markupPct: 2, source: 'mock' };
+  if (fnName === 'getUserStatementCsv') return 'Type,Bot,Amount,Status,Date\n';
+  return {};
+}
+
+boot();
+</script>
+</body>
+</html>

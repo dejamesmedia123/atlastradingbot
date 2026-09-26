@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AtlasTradeAI — Automated trading, run through Telegram</title>
+<meta name="description" content="AtlasTradeAI runs automated trading bots you deposit into from Telegram, with live TradingView charts, transparent trade logs, and a two-tier affiliate program.">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0E14; --surface:rgba(255,255,255,0.045); --surface-strong:rgba(255,255,255,0.08);
+    --border:rgba(255,255,255,0.09); --text:#E8EDF2; --muted:#8B96A5;
+    --mint:#2DD9A8; --mint-dim:rgba(45,217,168,0.14);
+    --gold:#F0B429; --gold-dim:rgba(240,180,41,0.14);
+    --rose:#FB7185; --rose-dim:rgba(251,113,133,0.14);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+  .glass{ background:var(--surface); border:1px solid var(--border); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border-radius:20px; }
+  .glass-strong{ background:var(--surface-strong); border:1px solid var(--border); backdrop-filter:blur(18px); border-radius:20px; }
+  .muted{color:var(--muted);}
+  .btn-primary{ background:var(--mint); color:#08110D; font-weight:600; border-radius:14px; padding:14px 26px; display:inline-flex; align-items:center; gap:8px; transition:transform .15s ease, box-shadow .15s ease; }
+  .btn-primary:hover{ transform:translateY(-2px); box-shadow:0 12px 30px -10px rgba(45,217,168,0.5); }
+  .btn-ghost{ background:rgba(255,255,255,0.06); border:1px solid var(--border); color:var(--text); border-radius:14px; padding:14px 26px; display:inline-flex; align-items:center; gap:8px; }
+  .btn-ghost:hover{ background:rgba(255,255,255,0.1); }
+  .chip{border-radius:999px; padding:5px 13px; font-size:12px; font-weight:600;}
+  .section{ padding:96px 24px; max-width:1180px; margin:0 auto; }
+  @media (max-width:768px){ .section{ padding:64px 20px; } }
+  .bg-image{ background-size:cover; background-position:center; }
+  .overlay-dark{ background:linear-gradient(180deg, rgba(10,14,20,0.55) 0%, rgba(10,14,20,0.85) 60%, #0A0E14 100%); }
+  .overlay-side{ background:linear-gradient(90deg, rgba(10,14,20,0.92) 15%, rgba(10,14,20,0.55) 60%, rgba(10,14,20,0.35) 100%); }
+  .num-badge{ width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:700; font-family:'Space Grotesk',sans-serif; }
+  details summary::-webkit-details-marker{ display:none; }
+  details[open] .chev{ transform:rotate(180deg); }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<header class="fixed top-0 left-0 right-0 z-50">
+  <div class="max-w-6xl mx-auto px-5 py-4">
+    <nav class="glass-strong flex items-center justify-between px-5 py-3">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:var(--mint-dim)"><i data-lucide="atom" class="w-4 h-4" style="color:var(--mint)"></i></div>
+        <span class="font-semibold text-[15px]" style="font-family:'Space Grotesk',sans-serif">AtlasTradeAI</span>
+      </div>
+      <div class="hidden md:flex items-center gap-7 text-sm muted">
+        <a href="#features" class="hover:text-white transition">Features</a>
+        <a href="#bots" class="hover:text-white transition">Bots</a>
+        <a href="#affiliate" class="hover:text-white transition">Affiliate</a>
+        <a href="#faq" class="hover:text-white transition">FAQ</a>
+      </div>
+      <a href="https://t.me/AtlasTradeAI_bot" class="btn-primary text-sm py-2.5 px-5">
+        <i data-lucide="send" class="w-3.5 h-3.5"></i> Open in Telegram
+      </a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="relative min-h-screen flex items-end bg-image" style="background-image:url('https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1920&q=80');">
+  <div class="absolute inset-0 overlay-dark"></div>
+  <div class="relative section pb-24 pt-40 w-full">
+    <span class="chip inline-block mb-5" style="color:var(--mint);background:var(--mint-dim)">Live on Telegram · NG, GH, KE, ZA & more</span>
+    <h1 class="text-4xl md:text-6xl font-bold leading-[1.08] max-w-3xl" style="font-family:'Space Grotesk',sans-serif">
+      Automated trading, <span style="color:var(--mint)">run entirely</span> inside Telegram.
+    </h1>
+    <p class="text-lg mt-6 max-w-xl" style="color:#C6CFD9">
+      Pick a bot, deposit within its range, and watch every trade logged transparently on a live TradingView chart. Withdraw on your terms, earn as an affiliate along the way.
+    </p>
+    <div class="flex flex-wrap gap-4 mt-9">
+      <a href="https://t.me/AtlasTradeAI_bot" class="btn-primary">
+        <i data-lucide="send" class="w-4 h-4"></i> Launch the mini app
+      </a>
+      <a href="#how" class="btn-ghost">
+        <i data-lucide="play-circle" class="w-4 h-4"></i> How it works
+      </a>
+    </div>
+    <div class="flex flex-wrap gap-8 mt-14 pt-8" style="border-top:1px solid rgba(255,255,255,0.1)">
+      <div><p class="text-2xl font-semibold" style="color:var(--mint)">0%</p><p class="muted text-xs mt-1">Hidden fees — every rate shown upfront</p></div>
+      <div><p class="text-2xl font-semibold" style="color:var(--gold)">15%</p><p class="muted text-xs mt-1">Direct affiliate commission</p></div>
+      <div><p class="text-2xl font-semibold">2 min</p><p class="muted text-xs mt-1">To deposit and start</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" class="section">
+  <div class="max-w-xl mb-14">
+    <span class="chip" style="color:var(--gold);background:var(--gold-dim)">Everything in one place</span>
+    <h2 class="text-3xl md:text-4xl font-semibold mt-4">A complete trading platform, not just a bot list</h2>
+    <p class="muted mt-3">From deposit to payout, every piece is built in — no spreadsheets, no separate apps.</p>
+  </div>
+  <div class="grid md:grid-cols-3 gap-5">
+    <div class="glass p-6">
+      <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style="background:var(--mint-dim)"><i data-lucide="bot" class="w-5 h-5" style="color:var(--mint)"></i></div>
+      <h3 class="font-semibold mb-2">Admin-managed bots</h3>
+      <p class="muted text-sm leading-relaxed">Add, edit, or retire bots anytime — deposit limits, profit share, risk level, and payout frequency all set per bot.</p>
+    </div>
+    <div class="glass p-6">
+      <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style="background:var(--gold-dim)"><i data-lucide="line-chart" class="w-5 h-5" style="color:var(--gold)"></i></div>
+      <h3 class="font-semibold mb-2">Live TradingView charts</h3>
+      <p class="muted text-sm leading-relaxed">Every bot streams a real embedded chart for its market, alongside a transparent, admin-logged trade history.</p>
+    </div>
+    <div class="glass p-6">
+      <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style="background:var(--rose-dim)"><i data-lucide="shield-check" class="w-5 h-5" style="color:var(--rose)"></i></div>
+      <h3 class="font-semibold mb-2">Verified deposits</h3>
+      <p class="muted text-sm leading-relaxed">Flutterwave checkout for supported countries, server-verified — manual bank/crypto with admin approval everywhere else.</p>
+    </div>
+    <div class="glass p-6">
+      <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style="background:var(--mint-dim)"><i data-lucide="share-2" class="w-5 h-5" style="color:var(--mint)"></i></div>
+      <h3 class="font-semibold mb-2">Two-tier affiliate program</h3>
+      <p class="muted text-sm leading-relaxed">Earn on direct referrals and their referrals, with tiers that raise your commission automatically as you grow.</p>
+    </div>
+    <div class="glass p-6">
+      <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style="background:var(--gold-dim)"><i data-lucide="lock-keyhole" class="w-5 h-5" style="color:var(--gold)"></i></div>
+      <h3 class="font-semibold mb-2">Two-factor withdrawals</h3>
+      <p class="muted text-sm leading-relaxed">Every withdrawal needs a one-time Telegram-delivered code — no surprises on your balance.</p>
+    </div>
+    <div class="glass p-6">
+      <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style="background:var(--rose-dim)"><i data-lucide="gauge" class="w-5 h-5" style="color:var(--rose)"></i></div>
+      <h3 class="font-semibold mb-2">Full admin control room</h3>
+      <p class="muted text-sm leading-relaxed">Stats dashboard, audit log, fraud flags, bulk trade import — run the whole platform from your phone.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" class="section">
+  <div class="max-w-xl mb-14">
+    <span class="chip" style="color:var(--mint);background:var(--mint-dim)">Getting started</span>
+    <h2 class="text-3xl md:text-4xl font-semibold mt-4">From opening Telegram to your first trade</h2>
+  </div>
+  <div class="grid md:grid-cols-4 gap-5">
+    <div class="glass p-5">
+      <div class="num-badge mb-4" style="background:var(--mint-dim); color:var(--mint)">1</div>
+      <h3 class="font-semibold text-sm mb-1.5">Open the mini app</h3>
+      <p class="muted text-xs leading-relaxed">Tap the bot in Telegram — no separate download or account to create.</p>
+    </div>
+    <div class="glass p-5">
+      <div class="num-badge mb-4" style="background:var(--gold-dim); color:var(--gold)">2</div>
+      <h3 class="font-semibold text-sm mb-1.5">Pick a bot</h3>
+      <p class="muted text-xs leading-relaxed">Compare risk level, chart, and deposit range across every active bot.</p>
+    </div>
+    <div class="glass p-5">
+      <div class="num-badge mb-4" style="background:var(--rose-dim); color:var(--rose)">3</div>
+      <h3 class="font-semibold text-sm mb-1.5">Deposit</h3>
+      <p class="muted text-xs leading-relaxed">Flutterwave for supported countries, manual bank/crypto with proof everywhere else.</p>
+    </div>
+    <div class="glass p-5">
+      <div class="num-badge mb-4" style="background:var(--mint-dim); color:var(--mint)">4</div>
+      <h3 class="font-semibold text-sm mb-1.5">Track & withdraw</h3>
+      <p class="muted text-xs leading-relaxed">Watch trades post live, then withdraw with a Telegram confirmation code once unlocked.</p>
+    </div>
+  </div>
+</section>
+
+<!-- BOTS SHOWCASE -->
+<section id="bots" class="section">
+  <div class="flex items-end justify-between flex-wrap gap-4 mb-10">
+    <div class="max-w-xl">
+      <span class="chip" style="color:var(--gold);background:var(--gold-dim)">Sample bots</span>
+      <h2 class="text-3xl md:text-4xl font-semibold mt-4">Every bot, fully transparent</h2>
+    </div>
+    <a href="https://t.me/AtlasTradeAI_bot" class="text-sm font-medium flex items-center gap-1" style="color:var(--mint)">See all bots <i data-lucide="arrow-right" class="w-4 h-4"></i></a>
+  </div>
+  <div class="grid md:grid-cols-2 gap-5">
+    <div class="glass overflow-hidden">
+      <div class="h-44 bg-image relative" style="background-image:url('https://images.unsplash.com/photo-1689732888407-310424e3a372?auto=format&fit=crop&w=900&q=80');">
+        <div class="absolute inset-0" style="background:linear-gradient(180deg, transparent 40%, rgba(10,14,20,0.9) 100%)"></div>
+        <span class="absolute bottom-3 left-4 chip" style="color:var(--gold);background:rgba(10,14,20,0.7)">Medium risk</span>
+      </div>
+      <div class="p-5">
+        <h3 class="font-semibold">Momentum FX Alpha</h3>
+        <p class="muted text-sm mt-1">Forex majors, momentum breakout signals · 20% profit share</p>
+        <div class="flex justify-between text-xs muted mt-4 pt-4" style="border-top:1px solid var(--border)">
+          <span>Deposit $50–$5,000</span><span>Weekly payout</span>
+        </div>
+      </div>
+    </div>
+    <div class="glass overflow-hidden">
+      <div class="h-44 bg-image relative" style="background-image:url('https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=900&q=80');">
+        <div class="absolute inset-0" style="background:linear-gradient(180deg, transparent 40%, rgba(10,14,20,0.9) 100%)"></div>
+        <span class="absolute bottom-3 left-4 chip" style="color:var(--rose);background:rgba(10,14,20,0.7)">High risk</span>
+      </div>
+      <div class="p-5">
+        <h3 class="font-semibold">Crypto Swing Bot</h3>
+        <p class="muted text-sm mt-1">BTC / ETH multi-day trend swings · 25% profit share</p>
+        <div class="flex justify-between text-xs muted mt-4 pt-4" style="border-top:1px solid var(--border)">
+          <span>Deposit $100–$10,000</span><span>Monthly payout</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AFFILIATE BANNER -->
+<section id="affiliate" class="relative bg-image my-4" style="background-image:url('https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=1920&q=80');">
+  <div class="absolute inset-0 overlay-side"></div>
+  <div class="relative section py-24">
+    <div class="max-w-lg">
+      <span class="chip" style="color:var(--mint);background:var(--mint-dim)">Affiliate program</span>
+      <h2 class="text-3xl md:text-4xl font-semibold mt-4">Earn from every trader you bring in — twice over</h2>
+      <p class="mt-4" style="color:#C6CFD9">15% direct commission on every confirmed deposit, plus 3% from your referrals' own referrals. Tiers push your rate up automatically as you grow: Silver at 5 referrals, Gold at 20.</p>
+      <div class="flex flex-wrap gap-5 mt-8">
+        <div class="glass-strong px-5 py-4"><p class="text-xl font-semibold" style="color:var(--mint)">15%</p><p class="muted text-xs mt-1">Direct commission</p></div>
+        <div class="glass-strong px-5 py-4"><p class="text-xl font-semibold" style="color:var(--gold)">+5%</p><p class="muted text-xs mt-1">Gold tier bonus</p></div>
+        <div class="glass-strong px-5 py-4"><p class="text-xl font-semibold">$20</p><p class="muted text-xs mt-1">Min. payout</p></div>
+      </div>
+      <a href="https://t.me/AtlasTradeAI_bot" class="btn-primary mt-9"><i data-lucide="share-2" class="w-4 h-4"></i> Get your referral link</a>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="section">
+  <div class="max-w-xl mb-14">
+    <span class="chip" style="color:var(--gold);background:var(--gold-dim)">What traders say</span>
+    <h2 class="text-3xl md:text-4xl font-semibold mt-4">Built around trust, one deposit at a time</h2>
+  </div>
+  <div class="grid md:grid-cols-3 gap-5">
+    <div class="glass p-6">
+      <div class="flex gap-1 mb-4" style="color:var(--gold)"><i data-lucide="star" class="w-4 h-4"></i><i data-lucide="star" class="w-4 h-4"></i><i data-lucide="star" class="w-4 h-4"></i><i data-lucide="star" class="w-4 h-4"></i><i data-lucide="star" class="w-4 h-4"></i></div>
+      <p class="text-sm leading-relaxed" style="color:#C6CFD9">"Being able to see every trade logged instead of just a profit number made the difference for me."</p>
+      <div class="flex items-center gap-3 mt-5">
+        <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold" style="background:var(--mint-dim); color:var(--mint)">TA</div>
+        <div><p class="text-xs font-medium">Trader, Lagos</p></div>
+      </div>
+    </div>
+    <div class="glass p-6">
+      <div class="flex gap-1 mb-4" style="color:var(--gold)"><i data-lucide="star" class="w-4 h-4"></i><i data-lucide="star" class="w-4 h-4"></i><i data-lucide="star" class="w-4 h-4"></i><i data-lucide="star" class="w-4 h-4"></i><i data-lucide="star" class="w-4 h-4"></i></div>
+      <p class="text-sm leading-relaxed" style="color:#C6CFD9">"The affiliate payouts actually land on time, and the tier bump to Silver happened without me asking."</p>
+      <div class="flex items-center gap-3 mt-5">
+        <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold" style="background:var(--gold-dim); color:var(--gold)">KN</div>
+        <div><p class="text-xs font-medium">Affiliate, Nairobi</p></div>
+      </div>
+    </div>
+    <div class="glass p-6">
+      <div class="flex gap-1 mb-4" style="color:var(--gold)"><i data-lucide="star" class="w-4 h-4"></i><i data-lucide="star" class="w-4 h-4"></i><i data-lucide="star" class="w-4 h-4"></i><i data-lucide="star" class="w-4 h-4"></i><i data-lucide="star" class="w-4 h-4"></i></div>
+      <p class="text-sm leading-relaxed" style="color:#C6CFD9">"Manual deposit got approved within the hour, and the confirmation code on withdrawal is a nice touch."</p>
+      <div class="flex items-center gap-3 mt-5">
+        <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold" style="background:var(--rose-dim); color:var(--rose)">MO</div>
+        <div><p class="text-xs font-medium">Trader, Accra</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="section">
+  <div class="max-w-xl mb-10">
+    <span class="chip" style="color:var(--mint);background:var(--mint-dim)">FAQ</span>
+    <h2 class="text-3xl md:text-4xl font-semibold mt-4">Common questions</h2>
+  </div>
+  <div class="flex flex-col gap-3 max-w-3xl">
+    <details class="glass p-5">
+      <summary class="flex justify-between items-center cursor-pointer font-medium text-sm">Which countries can pay with Flutterwave?<i data-lucide="chevron-down" class="chev w-4 h-4 muted transition-transform"></i></summary>
+      <p class="muted text-sm mt-3 leading-relaxed">Nigeria and a set of other supported African countries, configured by the admin team. Everywhere else, deposits go through manual bank transfer or crypto with proof, approved by an admin.</p>
+    </details>
+    <details class="glass p-5">
+      <summary class="flex justify-between items-center cursor-pointer font-medium text-sm">Is my deposit locked forever?<i data-lucide="chevron-down" class="chev w-4 h-4 muted transition-transform"></i></summary>
+      <p class="muted text-sm mt-3 leading-relaxed">No — each bot sets its own withdrawal lock period, shown before you deposit. Once it passes, you can withdraw down to that bot's minimum withdrawal amount, confirmed with a one-time code sent via Telegram.</p>
+    </details>
+    <details class="glass p-5">
+      <summary class="flex justify-between items-center cursor-pointer font-medium text-sm">How does the affiliate commission actually get paid?<i data-lucide="chevron-down" class="chev w-4 h-4 muted transition-transform"></i></summary>
+      <p class="muted text-sm mt-3 leading-relaxed">Commission is credited only when a referred deposit is confirmed, never on signup alone. Once your pending balance passes $20, request a payout and an admin settles it — automatically via Flutterwave where your bank details are on file, or manually otherwise.</p>
+    </details>
+    <details class="glass p-5">
+      <summary class="flex justify-between items-center cursor-pointer font-medium text-sm">Who decides which bots are available?<i data-lucide="chevron-down" class="chev w-4 h-4 muted transition-transform"></i></summary>
+      <p class="muted text-sm mt-3 leading-relaxed">The AtlasTradeAI admin team adds, edits, and retires bots — setting deposit limits, profit share, and risk level for each one before it goes live.</p>
+    </details>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="relative bg-image mx-4 md:mx-6 rounded-3xl overflow-hidden my-10" style="background-image:url('https://images.unsplash.com/photo-1462899006636-339e08d1844e?auto=format&fit=crop&w=1920&q=80');">
+  <div class="absolute inset-0 overlay-dark"></div>
+  <div class="relative text-center py-24 px-6">
+    <h2 class="text-3xl md:text-5xl font-semibold max-w-2xl mx-auto" style="font-family:'Space Grotesk',sans-serif">Your first bot is two taps away.</h2>
+    <p class="muted mt-4 max-w-md mx-auto">Open Telegram, pick a bot, and see every trade for yourself.</p>
+    <a href="https://t.me/AtlasTradeAI_bot" class="btn-primary mt-8"><i data-lucide="send" class="w-4 h-4"></i> Open AtlasTradeAI in Telegram</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="section pt-10 pb-14" style="border-top:1px solid var(--border)">
+  <div class="flex flex-col md:flex-row justify-between gap-10">
+    <div class="max-w-xs">
+      <div class="flex items-center gap-2 mb-3">
+        <div class="w-7 h-7 rounded-lg flex items-center justify-center" style="background:var(--mint-dim)"><i data-lucide="atom" class="w-3.5 h-3.5" style="color:var(--mint)"></i></div>
+        <span class="font-semibold text-sm" style="font-family:'Space Grotesk',sans-serif">AtlasTradeAI</span>
+      </div>
+      <p class="muted text-xs leading-relaxed">Trading carries risk, including loss of principal. Past performance does not guarantee future results. Review each bot's terms before depositing.</p>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-8 text-sm">
+      <div>
+        <p class="font-medium mb-3 text-xs muted">Product</p>
+        <div class="flex flex-col gap-2 muted text-xs">
+          <a href="#features" class="hover:text-white transition">Features</a>
+          <a href="#bots" class="hover:text-white transition">Bots</a>
+          <a href="#affiliate" class="hover:text-white transition">Affiliate program</a>
+        </div>
+      </div>
+      <div>
+        <p class="font-medium mb-3 text-xs muted">Company</p>
+        <div class="flex flex-col gap-2 muted text-xs">
+          <a href="#faq" class="hover:text-white transition">FAQ</a>
+          <a href="#" class="hover:text-white transition">Terms of use</a>
+          <a href="#" class="hover:text-white transition">Privacy policy</a>
+        </div>
+      </div>
+      <div>
+        <p class="font-medium mb-3 text-xs muted">Connect</p>
+        <div class="flex flex-col gap-2 muted text-xs">
+          <a href="https://t.me/AtlasTradeAI_bot" class="hover:text-white transition">Telegram</a>
+          <a href="#" class="hover:text-white transition">Support</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="flex flex-col sm:flex-row justify-between items-center gap-3 mt-12 pt-6 text-xs muted" style="border-top:1px solid var(--border)">
+    <span>© 2026 AtlasTradeAI. All rights reserved.</span>
+    <span>Images via Unsplash.</span>
+  </div>
+</footer>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>
