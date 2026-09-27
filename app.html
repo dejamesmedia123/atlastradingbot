@@ -290,7 +290,7 @@ function renderBotDetail(bot, trades) {
     </div>
     <div class="glass mb-4 overflow-hidden" style="height:280px"><div id="tv_chart" style="height:100%"></div></div>
     <div class="grid grid-cols-2 gap-3 mb-4">
-      ${statTile('Profit share', (bot.profitSharePct||0)+'%')}
+      ${profitSplitTile(bot)}
       ${statTile('Payout', bot.payoutFrequency||'—')}
       ${statTile('Min deposit', '$'+(bot.minDeposit||0))}
       ${statTile('Max deposit', bot.maxDeposit ? '$'+bot.maxDeposit : 'No cap')}
@@ -318,6 +318,19 @@ function loadTradingViewWidget(symbol) {
 }
 
 function statTile(label, value) { return `<div class="glass p-3"><p class="muted text-[11px]">${label}</p><p class="font-semibold text-sm mt-1">${value}</p></div>`; }
+
+// Same stat-tile shell as statTile(), but shows the profit split as two figures — what
+// the depositor keeps vs. the platform's performance-fee cut — instead of a single bare
+// "20%" that doesn't say which side that 20% belongs to.
+function profitSplitTile(bot) {
+  const platformPct = Number(bot.profitSharePct || 0);
+  const youPct = Math.max(0, 100 - platformPct);
+  return `<div class="glass p-3">
+    <p class="muted text-[11px]">Profit split</p>
+    <p class="font-semibold text-sm mt-1" style="color:var(--mint)">You keep ${youPct}%</p>
+    <p class="muted text-[11px] mt-0.5">Platform ${platformPct}%</p>
+  </div>`;
+}
 
 function tradeRow(t) {
   const profit = Number(t.profitPct||0);
