@@ -201,12 +201,14 @@ async function renderStats() {
     screenHeader('Overview') +
     `<div class="grid grid-cols-2 gap-3">
       ${metricTile('Total AUM', '$' + s.totalAUM.toFixed(2), 'var(--mint)')}
+      ${metricTile('Platform profit share earned', '$' + (s.platformProfitEarned||0).toFixed(2), 'var(--mint)')}
       ${metricTile('Active users', s.activeUsers, 'var(--text)')}
       ${metricTile('Pending deposits', s.pendingDeposits, s.pendingDeposits ? 'var(--gold)' : 'var(--text)')}
       ${metricTile('Pending withdrawals', s.pendingWithdrawals, s.pendingWithdrawals ? 'var(--gold)' : 'var(--text)')}
       ${metricTile('Payouts due', s.pendingPayouts, s.pendingPayouts ? 'var(--gold)' : 'var(--text)')}
       ${metricTile('Open flags', s.openFlags, s.openFlags ? 'var(--rose)' : 'var(--text)')}
     </div>
+    <p class="muted text-[11px] mt-2">Profit share earned reflects each bot's cumulative trading return applied to its confirmed deposit base, less nothing on losing periods — it's a portfolio-level estimate, not a per-user ledger sum.</p>
     <p class="muted text-xs mt-5">Signed in as ${STATE.role === 'super' ? 'super admin' : 'support admin'}</p>`;
   lucide.createIcons();
 }
@@ -741,7 +743,7 @@ function mockBackend(fnName, args) {
   if (fnName === 'adminGetFlags') return [];
   if (fnName === 'adminGetAuditLog') return [];
   if (fnName === 'adminListAdmins') return [{ telegramId: TELEGRAM_ID, name:'You', role:'super' }];
-  if (fnName === 'adminGetStats') return { totalAUM:0, activeUsers:0, pendingDeposits:0, pendingWithdrawals:0, pendingPayouts:0, openFlags:0 };
+  if (fnName === 'adminGetStats') return { totalAUM:0, activeUsers:0, pendingDeposits:0, pendingWithdrawals:0, pendingPayouts:0, openFlags:0, platformProfitEarned:0 };
   if (fnName === 'adminGetWaitlist') return [];
   if (fnName === 'adminGetSettings') return {
     spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/mock/edit',

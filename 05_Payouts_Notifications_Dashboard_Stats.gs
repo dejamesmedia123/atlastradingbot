@@ -103,6 +103,20 @@ function notifyBotSubscribersNewTrade_(trade) {
   Object.keys(subscribers).forEach(function (tid) { notifyUser_(tid, text); });
 }
 
+// ---------- PROFIT SPLIT ----------
+// Splits a bot's gross trading return into what the user actually keeps vs. what the
+// platform earns as its performance fee (bot.profitSharePct). The split is only applied
+// to genuine profit — on a losing stretch the platform takes 0% of the loss and the user
+// simply carries the full drawdown, same as a normal performance-fee/hurdle structure.
+function splitProfit_(grossProfitUsd, profitSharePct) {
+  const platformPct = Math.max(0, Math.min(100, Number(profitSharePct || 0)));
+  if (grossProfitUsd <= 0) {
+    return { userProfitUsd: grossProfitUsd, platformProfitUsd: 0, platformPct: platformPct };
+  }
+  const platformProfitUsd = grossProfitUsd * (platformPct / 100);
+  return { userProfitUsd: grossProfitUsd - platformProfitUsd, platformProfitUsd: platformProfitUsd, platformPct: platformPct };
+}
+
 // ---------- DASHBOARD ----------
 function getUserDashboard(telegramId) {
   const deposits = getUserDeposits(telegramId).filter(function (d) { return d.status === 'confirmed'; });
@@ -120,11 +134,23 @@ function getUserDashboard(telegramId) {
     const p = byBot[botId];
     const bot = getBot(botId);
     const trades = getTrades(botId);
-    const profitPct = trades.reduce(function (sum, t) { return sum + Number(t.profitPct || 0); }, 0);
+    const grossProfitPct = trades.reduce(function (sum, t) { return sum + Number(t.profitPct || 0); }, 0);
+    const grossProfitUsd = p.deposited * (grossProfitPct / 100);
+    const split = splitProfit_(grossProfitUsd, bot ? bot.profitSharePct : 0);
+    const userProfitPct = p.deposited ? (split.userProfitUsd / p.deposited) * 100 : 0;
+    const platformProfitPct = p.deposited ? (split.platformProfitUsd / p.deposited) * 100 : 0;
     const daysSinceDeposit = Math.floor((new Date() - new Date(p.firstDepositAt)) / 86400000);
     return {
       botId: botId, botName: bot ? bot.name : 'Unknown', deposited: p.deposited, withdrawn: p.withdrawn,
-      balance: p.deposited - p.withdrawn, estProfitPct: profitPct, daysSinceDeposit: daysSinceDeposit,
+      balance: p.deposited - p.withdrawn,
+      // Gross figures — the bot's raw trading return before any performance fee.
+      estProfitPct: grossProfitPct, estProfitUsd: grossProfitUsd,
+      // What the user actually keeps, after the platform's profit-share fee.
+      userProfitPct: userProfitPct, userProfitUsd: split.userProfitUsd,
+      // What the platform earns as its performance fee on this position.
+      platformProfitPct: platformProfitPct, platformProfitUsd: split.platformProfitUsd,
+      profitSharePct: split.platformPct,
+      daysSinceDeposit: daysSinceDeposit,
       withdrawalUnlocked: bot ? daysSinceDeposit >= Number(bot.withdrawalLockDays || 0) : true
     };
   });
@@ -149,12 +175,34 @@ function adminGetStats(telegramId) {
   const confirmedDeposits = deposits.filter(function (d) { return d.status === 'confirmed'; }).reduce(function (s, d) { return s + Number(d.amount); }, 0);
   const paidWithdrawals = withdrawals.filter(function (w) { return w.status === 'paid'; }).reduce(function (s, w) { return s + Number(w.amount); }, 0);
   const affiliates = sheetToObjects_(SHEET_NAMES.AFFILIATES);
+
+  // Platform's aggregate profit-share earnings across every bot: for each bot, apply its
+  // trades' cumulative gross return % to that bot's confirmed deposit base, then take the
+  // bot's profitSharePct cut of any positive result (losses cost the platform nothing, same
+  // rule as the per-user split in getUserDashboard/splitProfit_). This is a portfolio-level
+  // estimate — not a per-user sum — for the same reason totalAUM above is aggregate, not
+  // per-user: it's fast to compute and accurate enough for an overview tile.
+  const bots = sheetToObjects_(SHEET_NAMES.BOTS);
+  const confirmedByBot = {};
+  deposits.forEach(function (d) {
+    if (d.status !== 'confirmed') return;
+    confirmedByBot[d.botId] = (confirmedByBot[d.botId] || 0) + Number(d.amount);
+  });
+  const platformProfitEarned = bots.reduce(function (sum, bot) {
+    const botDeposits = confirmedByBot[bot.id] || 0;
+    if (!botDeposits) return sum;
+    const grossProfitPct = getTrades(bot.id).reduce(function (s, t) { return s + Number(t.profitPct || 0); }, 0);
+    const grossProfitUsd = botDeposits * (grossProfitPct / 100);
+    return sum + splitProfit_(grossProfitUsd, bot.profitSharePct).platformProfitUsd;
+  }, 0);
+
   return {
     totalAUM: confirmedDeposits - paidWithdrawals,
     activeUsers: sheetToObjects_(SHEET_NAMES.USERS).length,
     pendingDeposits: deposits.filter(function (d) { return d.status === 'pending'; }).length,
     pendingWithdrawals: withdrawals.filter(function (w) { return w.status === 'pending'; }).length,
     pendingPayouts: affiliates.filter(function (a) { return Number(a.pendingEarnings || 0) >= getSettings_().payoutThreshold; }).length,
-    openFlags: sheetToObjects_(SHEET_NAMES.FLAGS).filter(function (f) { return f.reviewed !== true && f.reviewed !== 'TRUE'; }).length
+    openFlags: sheetToObjects_(SHEET_NAMES.FLAGS).filter(function (f) { return f.reviewed !== true && f.reviewed !== 'TRUE'; }).length,
+    platformProfitEarned: platformProfitEarned
   };
 }
