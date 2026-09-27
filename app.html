@@ -80,6 +80,64 @@ const tgUser = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) || { id: 'dem
 const startParam = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
 const TELEGRAM_ID = String(tgUser.id);
 
+// ISO 3166-1 alpha-2 code, English short name, ISO 4217 currency code.
+// Flag is derived at render time from the code (flagEmoji()) — no image assets needed.
+const COUNTRIES = [
+['AF','Afghanistan','AFN'],['AL','Albania','ALL'],['DZ','Algeria','DZD'],['AD','Andorra','EUR'],['AO','Angola','AOA'],
+['AG','Antigua and Barbuda','XCD'],['AR','Argentina','ARS'],['AM','Armenia','AMD'],['AU','Australia','AUD'],['AT','Austria','EUR'],
+['AZ','Azerbaijan','AZN'],['BS','Bahamas','BSD'],['BH','Bahrain','BHD'],['BD','Bangladesh','BDT'],['BB','Barbados','BBD'],
+['BY','Belarus','BYN'],['BE','Belgium','EUR'],['BZ','Belize','BZD'],['BJ','Benin','XOF'],['BT','Bhutan','BTN'],
+['BO','Bolivia','BOB'],['BA','Bosnia and Herzegovina','BAM'],['BW','Botswana','BWP'],['BR','Brazil','BRL'],['BN','Brunei','BND'],
+['BG','Bulgaria','BGN'],['BF','Burkina Faso','XOF'],['BI','Burundi','BIF'],['CV','Cabo Verde','CVE'],['KH','Cambodia','KHR'],
+['CM','Cameroon','XAF'],['CA','Canada','CAD'],['CF','Central African Republic','XAF'],['TD','Chad','XAF'],['CL','Chile','CLP'],
+['CN','China','CNY'],['CO','Colombia','COP'],['KM','Comoros','KMF'],['CG','Congo','XAF'],['CD','Congo (DRC)','CDF'],
+['CR','Costa Rica','CRC'],['CI','Côte d\u2019Ivoire','XOF'],['HR','Croatia','EUR'],['CU','Cuba','CUP'],['CY','Cyprus','EUR'],
+['CZ','Czechia','CZK'],['DK','Denmark','DKK'],['DJ','Djibouti','DJF'],['DM','Dominica','XCD'],['DO','Dominican Republic','DOP'],
+['EC','Ecuador','USD'],['EG','Egypt','EGP'],['SV','El Salvador','USD'],['GQ','Equatorial Guinea','XAF'],['ER','Eritrea','ERN'],
+['EE','Estonia','EUR'],['SZ','Eswatini','SZL'],['ET','Ethiopia','ETB'],['FJ','Fiji','FJD'],['FI','Finland','EUR'],
+['FR','France','EUR'],['GA','Gabon','XAF'],['GM','Gambia','GMD'],['GE','Georgia','GEL'],['DE','Germany','EUR'],
+['GH','Ghana','GHS'],['GR','Greece','EUR'],['GD','Grenada','XCD'],['GT','Guatemala','GTQ'],['GN','Guinea','GNF'],
+['GW','Guinea-Bissau','XOF'],['GY','Guyana','GYD'],['HT','Haiti','HTG'],['HN','Honduras','HNL'],['HU','Hungary','HUF'],
+['IS','Iceland','ISK'],['IN','India','INR'],['ID','Indonesia','IDR'],['IR','Iran','IRR'],['IQ','Iraq','IQD'],
+['IE','Ireland','EUR'],['IL','Israel','ILS'],['IT','Italy','EUR'],['JM','Jamaica','JMD'],['JP','Japan','JPY'],
+['JO','Jordan','JOD'],['KZ','Kazakhstan','KZT'],['KE','Kenya','KES'],['KI','Kiribati','AUD'],['KW','Kuwait','KWD'],
+['KG','Kyrgyzstan','KGS'],['LA','Laos','LAK'],['LV','Latvia','EUR'],['LB','Lebanon','LBP'],['LS','Lesotho','LSL'],
+['LR','Liberia','LRD'],['LY','Libya','LYD'],['LI','Liechtenstein','CHF'],['LT','Lithuania','EUR'],['LU','Luxembourg','EUR'],
+['MG','Madagascar','MGA'],['MW','Malawi','MWK'],['MY','Malaysia','MYR'],['MV','Maldives','MVR'],['ML','Mali','XOF'],
+['MT','Malta','EUR'],['MH','Marshall Islands','USD'],['MR','Mauritania','MRU'],['MU','Mauritius','MUR'],['MX','Mexico','MXN'],
+['FM','Micronesia','USD'],['MD','Moldova','MDL'],['MC','Monaco','EUR'],['MN','Mongolia','MNT'],['ME','Montenegro','EUR'],
+['MA','Morocco','MAD'],['MZ','Mozambique','MZN'],['MM','Myanmar','MMK'],['NA','Namibia','NAD'],['NR','Nauru','AUD'],
+['NP','Nepal','NPR'],['NL','Netherlands','EUR'],['NZ','New Zealand','NZD'],['NI','Nicaragua','NIO'],['NE','Niger','XOF'],
+['NG','Nigeria','NGN'],['MK','North Macedonia','MKD'],['NO','Norway','NOK'],['OM','Oman','OMR'],['PK','Pakistan','PKR'],
+['PW','Palau','USD'],['PA','Panama','USD'],['PG','Papua New Guinea','PGK'],['PY','Paraguay','PYG'],['PE','Peru','PEN'],
+['PH','Philippines','PHP'],['PL','Poland','PLN'],['PT','Portugal','EUR'],['QA','Qatar','QAR'],['RO','Romania','RON'],
+['RU','Russia','RUB'],['RW','Rwanda','RWF'],['KN','Saint Kitts and Nevis','XCD'],['LC','Saint Lucia','XCD'],['VC','Saint Vincent and the Grenadines','XCD'],
+['WS','Samoa','WST'],['SM','San Marino','EUR'],['ST','São Tomé and Príncipe','STN'],['SA','Saudi Arabia','SAR'],['SN','Senegal','XOF'],
+['RS','Serbia','RSD'],['SC','Seychelles','SCR'],['SL','Sierra Leone','SLE'],['SG','Singapore','SGD'],['SK','Slovakia','EUR'],
+['SI','Slovenia','EUR'],['SB','Solomon Islands','SBD'],['SO','Somalia','SOS'],['ZA','South Africa','ZAR'],['SS','South Sudan','SSP'],
+['ES','Spain','EUR'],['LK','Sri Lanka','LKR'],['SD','Sudan','SDG'],['SR','Suriname','SRD'],['SE','Sweden','SEK'],
+['CH','Switzerland','CHF'],['SY','Syria','SYP'],['TW','Taiwan','TWD'],['TJ','Tajikistan','TJS'],['TZ','Tanzania','TZS'],
+['TH','Thailand','THB'],['TL','Timor-Leste','USD'],['TG','Togo','XOF'],['TO','Tonga','TOP'],['TT','Trinidad and Tobago','TTD'],
+['TN','Tunisia','TND'],['TR','Turkey','TRY'],['TM','Turkmenistan','TMT'],['TV','Tuvalu','AUD'],['UG','Uganda','UGX'],
+['UA','Ukraine','UAH'],['AE','United Arab Emirates','AED'],['GB','United Kingdom','GBP'],['US','United States','USD'],['UY','Uruguay','UYU'],
+['UZ','Uzbekistan','UZS'],['VU','Vanuatu','VUV'],['VA','Vatican City','EUR'],['VE','Venezuela','VES'],['VN','Vietnam','VND'],
+['YE','Yemen','YER'],['ZM','Zambia','ZMW'],['ZW','Zimbabwe','ZWL'],
+].map(function(r){ return { code:r[0], name:r[1], currency:r[2] }; });
+
+function flagEmoji(iso2) {
+  if (!iso2 || iso2.length !== 2) return '';
+  return String.fromCodePoint(...[...iso2.toUpperCase()].map(function(c){ return 127397 + c.charCodeAt(0); }));
+}
+function countryOptionsHtml(selectedCode) {
+  return '<option value="">Select your country…</option>' + COUNTRIES.map(function(c){
+    return '<option value="' + c.code + '"' + (c.code===selectedCode?' selected':'') + '>' + flagEmoji(c.code) + ' ' + c.name + '</option>';
+  }).join('');
+}
+function currencyForCountry(code) {
+  const c = COUNTRIES.find(function(x){ return x.code === String(code).toUpperCase(); });
+  return c ? c.currency : 'USD';
+}
+
 let STATE = { user: null, bots: [], currentTab: 'home', selectedBotId: null, publicSettings: { botUsername: '', flutterwaveCountries: [] } };
 
 // Backend is now a static-friendly Google Apps Script JSON API (no more google.script.run,
@@ -272,8 +330,8 @@ function tradeRow(t) {
 
 // ---- DEPOSIT FORM ----
 function renderDepositForm(bot) {
-  const recommended = getRecommendedMethodClientSide(STATE.user.country);
-  const currencies = (bot.currencies || 'NGN,USD').split(',').map(c => c.trim()).filter(Boolean);
+  const supported = STATE.user.country && (STATE.publicSettings.flutterwaveCountries || []).indexOf(STATE.user.country) !== -1;
+  const currency = STATE.user.country ? currencyForCountry(STATE.user.country) : 'USD';
   document.getElementById('screen').innerHTML = `
     <button id="backBtn" class="flex items-center gap-1 muted text-sm mb-4"><i data-lucide="chevron-left" class="w-4 h-4"></i> ${escapeHtml(bot.name)}</button>
     <h1 class="text-xl font-semibold mb-1">Deposit</h1>
@@ -282,8 +340,8 @@ function renderDepositForm(bot) {
     ${!STATE.user.country ? `
     <div class="glass p-4 mb-4">
       <label class="muted text-xs">Your country</label>
-      <input id="countryInput" type="text" placeholder="e.g. NG, GH, US" class="mt-1.5" maxlength="2" style="text-transform:uppercase" />
-      <p class="muted text-[11px] mt-2">We use this to recommend the right payment method.</p>
+      <select id="countryInput" class="mt-1.5">${countryOptionsHtml('')}</select>
+      <p class="muted text-[11px] mt-2">We use this to recommend the right payment method and currency.</p>
     </div>` : ''}
 
     <div class="glass p-4 mb-4">
@@ -291,25 +349,27 @@ function renderDepositForm(bot) {
       <input id="amountInput" type="number" placeholder="e.g. 100" class="mt-1.5" />
     </div>
 
+    ${STATE.user.country ? `
     <div class="glass p-4 mb-4">
       <p class="muted text-xs mb-2">Payment method</p>
       <div class="flex flex-col gap-2">
-        <label class="flex items-center gap-2 text-sm"><input type="radio" name="method" value="flutterwave" ${recommended==='flutterwave'?'checked':''} class="w-auto"> Flutterwave (supported countries)</label>
-        <label class="flex items-center gap-2 text-sm"><input type="radio" name="method" value="manual" ${recommended==='manual'?'checked':''} class="w-auto"> Manual (bank transfer / crypto)</label>
+        ${supported ? `<label class="flex items-center gap-2 text-sm"><input type="radio" name="method" value="flutterwave" checked class="w-auto"> Card / bank / mobile money (${flagEmoji(STATE.user.country)} ${currency})</label>
+        <label class="flex items-center gap-2 text-sm"><input type="radio" name="method" value="manual" class="w-auto"> Crypto</label>` : `<p class="text-sm">Card and bank payment aren't available for ${flagEmoji(STATE.user.country)} your country yet — deposit with crypto below.</p>`}
       </div>
-    </div>
+    </div>` : ''}
 
-    <div id="flwFields" class="glass p-4 mb-4 ${recommended==='flutterwave'?'':'hidden'}">
+    <div id="flwFields" class="glass p-4 mb-4 ${supported && STATE.user.country ? '' : 'hidden'}">
       <label class="muted text-xs">Email (for your payment receipt)</label>
       <input id="flwEmail" type="email" placeholder="you@example.com" class="mt-1.5" />
-      <label class="muted text-xs mt-3 block">Currency</label>
-      <select id="flwCurrency" class="mt-1.5">${currencies.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select>
+      <p class="muted text-[11px] mt-2">Currency: ${flagEmoji(STATE.user.country)} ${currency}</p>
       <p id="fxPreview" class="muted text-[11px] mt-2"></p>
     </div>
 
-    <div id="manualFields" class="glass p-4 mb-4 ${recommended==='manual'?'':'hidden'}">
+    <div id="manualFields" class="glass p-4 mb-4 ${!supported || !STATE.user.country ? '' : 'hidden'}">
+      <p class="muted text-xs mb-2">Deposit instructions</p>
+      <p class="text-sm whitespace-pre-line mb-3">${escapeHtml(STATE.publicSettings.cryptoDepositInstructions || 'Not configured yet — contact support.')}</p>
       <label class="muted text-xs">Proof / transaction reference</label>
-      <input id="proofInput" type="text" placeholder="Tx hash or bank reference" class="mt-1.5" />
+      <input id="proofInput" type="text" placeholder="Tx hash" class="mt-1.5" />
       <p class="muted text-[11px] mt-2">Your deposit will be marked pending until admin confirms it.</p>
     </div>
 
@@ -322,32 +382,32 @@ function renderDepositForm(bot) {
     document.getElementById('manualFields').classList.toggle('hidden', e.target.value !== 'manual');
     document.getElementById('flwFields').classList.toggle('hidden', e.target.value !== 'flutterwave');
   }));
+  const countryInputEl = document.getElementById('countryInput');
+  if (countryInputEl) countryInputEl.addEventListener('change', async () => {
+    if (!countryInputEl.value) return;
+    try { STATE.user = await gs('updateUserCountry', TELEGRAM_ID, countryInputEl.value); renderDepositForm(bot); }
+    catch (err) { document.getElementById('depositMsg').textContent = err.message; }
+  });
   const updateFxPreview = async () => {
     const previewEl = document.getElementById('fxPreview');
+    if (!previewEl) return;
     const amt = Number(document.getElementById('amountInput').value);
-    const cur = document.getElementById('flwCurrency').value;
     if (!amt) { previewEl.textContent = ''; return; }
-    if (cur === 'USD') { previewEl.textContent = 'Charged as $' + amt.toFixed(2) + '.'; return; }
+    if (currency === 'USD') { previewEl.textContent = 'Charged as $' + amt.toFixed(2) + '.'; return; }
     previewEl.textContent = 'Calculating…';
     try {
-      const conv = await gs('getConvertedDepositAmount', amt, cur);
-      previewEl.textContent = 'You\'ll be charged ≈ ' + conv.localAmount.toLocaleString() + ' ' + cur + ' (includes ' + conv.markupPct + '% fee).';
+      const conv = await gs('getConvertedDepositAmount', amt, currency);
+      previewEl.textContent = 'You\'ll be charged ≈ ' + conv.localAmount.toLocaleString() + ' ' + currency + ' (includes ' + conv.markupPct + '% fee).';
     } catch (err) { previewEl.textContent = err.message; }
   };
   document.getElementById('amountInput').addEventListener('input', debounce(updateFxPreview, 500));
-  const flwCurrencyEl = document.getElementById('flwCurrency');
-  if (flwCurrencyEl) flwCurrencyEl.addEventListener('change', updateFxPreview);
   document.getElementById('submitDeposit').addEventListener('click', async () => {
     const amount = Number(document.getElementById('amountInput').value);
-    const method = document.querySelector('input[name=method]:checked').value;
-    const countryInput = document.getElementById('countryInput');
+    const methodEl = document.querySelector('input[name=method]:checked');
+    const method = methodEl ? methodEl.value : 'manual';
     const msgEl = document.getElementById('depositMsg');
     if (!amount) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = 'Enter an amount.'; return; }
-
-    if (countryInput && countryInput.value) {
-      try { STATE.user = await gs('updateUserCountry', TELEGRAM_ID, countryInput.value.toUpperCase()); }
-      catch (err) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = err.message; return; }
-    }
+    if (!STATE.user.country) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = 'Select your country first.'; return; }
 
     if (method === 'manual') {
       const proof = document.getElementById('proofInput').value;
@@ -369,7 +429,6 @@ function renderDepositForm(bot) {
     if (!publicKey) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = 'Flutterwave isn\'t configured yet — ask the admin to add a public key in Settings.'; return; }
     const email = document.getElementById('flwEmail').value;
     if (!email) { msgEl.style.color = 'var(--rose)'; msgEl.textContent = 'Enter an email for your receipt.'; return; }
-    const currency = document.getElementById('flwCurrency').value;
     const txRef = 'atlas_dep_' + TELEGRAM_ID + '_' + Date.now();
 
     msgEl.style.color = 'var(--text)'; msgEl.textContent = 'Preparing checkout…';
@@ -406,11 +465,6 @@ function renderDepositForm(bot) {
       }
     });
   });
-}
-
-function getRecommendedMethodClientSide(country) {
-  const flw = STATE.publicSettings.flutterwaveCountries || [];
-  return flw.indexOf(String(country||'').toUpperCase()) !== -1 ? 'flutterwave' : 'manual';
 }
 
 // ---- DASHBOARD ----
@@ -552,7 +606,7 @@ function renderBankDetailsForm(affiliate) {
       <div><label class="muted text-xs">Bank code</label><input id="bankCode" value="${escapeAttr(affiliate.bankCode)}" placeholder="e.g. 044" class="mt-1"/></div>
       <div><label class="muted text-xs">Account number</label><input id="acctNum" value="${escapeAttr(affiliate.accountNumber)}" class="mt-1"/></div>
       <div><label class="muted text-xs">Account name</label><input id="acctName" value="${escapeAttr(affiliate.accountName)}" class="mt-1"/></div>
-      <div><label class="muted text-xs">Country</label><input id="bankCountry" value="${escapeAttr(affiliate.bankCountry)}" placeholder="NG" maxlength="2" class="mt-1"/></div>
+      <div><label class="muted text-xs">Country</label><select id="bankCountry" class="mt-1">${countryOptionsHtml(affiliate.bankCountry || '')}</select></div>
       <button id="saveBank" class="btn-primary w-full mt-2">Save details</button>
       <p id="bankMsg" class="text-sm text-center"></p>
     </div>`;
@@ -616,7 +670,7 @@ function emptyState(icon, title, sub) {
 // ---- mock backend for local preview only ----
 function mockBackend(fnName, args) {
   const demoBots = [{ id:'demo1', name:'Momentum FX Alpha', description:'Trades major forex pairs using momentum breakout signals.', tvSymbol:'FX:EURUSD', riskLevel:'Medium', minDeposit:50, maxDeposit:5000, profitSharePct:20, payoutFrequency:'Weekly', assetClass:'Forex' }];
-  if (fnName === 'getPublicSettings') return { botUsername: 'AtlasTradeAI_bot', flutterwaveCountries: ['NG','GH','KE','ZA','UG','TZ','RW','ZM','CI','SN','CM'] };
+  if (fnName === 'getPublicSettings') return { botUsername: 'atlasaitradeBot', flutterwaveCountries: ['NG','GH','KE','ZA','UG','TZ','RW','ZM','CI','SN','CM'], cryptoDepositInstructions: 'Send USDT (TRC20) to: T-preview-only\nInclude your Telegram username in the memo.' };
   if (fnName === 'getOrCreateUser') return { id:'u1', name: args[0].name, username: args[0].username, country:'', tosAcceptedAt: new Date().toISOString(), createdAt: new Date().toISOString() };
   if (fnName === 'acceptTerms') return { tosAcceptedAt: new Date().toISOString() };
   if (fnName === 'updateUserCountry') return { country: args[1] };

@@ -26,6 +26,7 @@ function getSettings_() {
     botUsername: String(map.botUsername || ''),
     flutterwavePublicKey: String(map.flutterwavePublicKey || ''),
     flutterwaveCountries: String(map.flutterwaveCountries || '').split(',').map(function (c) { return c.trim().toUpperCase(); }).filter(Boolean),
+    cryptoDepositInstructions: String(map.cryptoDepositInstructions || ''),
     directCommissionPct: Number(map.directCommissionPct),
     uplineCommissionPct: Number(map.uplineCommissionPct),
     payoutThreshold: Number(map.payoutThreshold),
@@ -48,10 +49,11 @@ function getTierRules_(settings) {
   ];
 }
 
-// Public — no auth. Used by the user mini app to build referral links and pick a payment method.
+// Public — no auth. Used by the user mini app to build referral links, pick a payment
+// method, and (for countries not in flutterwaveCountries) show crypto deposit instructions.
 function getPublicSettings() {
   const s = getSettings_();
-  return { botUsername: s.botUsername, flutterwaveCountries: s.flutterwaveCountries, flutterwavePublicKey: s.flutterwavePublicKey };
+  return { botUsername: s.botUsername, flutterwaveCountries: s.flutterwaveCountries, flutterwavePublicKey: s.flutterwavePublicKey, cryptoDepositInstructions: s.cryptoDepositInstructions };
 }
 
 function adminGetSettings(telegramId) {
@@ -91,24 +93,36 @@ function adminSaveSecrets(telegramId, secretsObj) {
   return true;
 }
 
-// ---------- FX RATES (TradingView scanner, cached ~24h, with admin fallback) ----------
-// NOTE: scanner.tradingview.com is TradingView's own internal, undocumented endpoint —
-// not an official public API. It works without a key, but can change or block requests
-// without notice, and doesn't reliably cover every exotic currency. That's why every
-// call here falls back to an admin-set rate if it fails. Admin-set fallback rates live
-// in the SAME sheet as the live TradingView cache (FxRates), just tagged with
+// ---------- FX RATES (TradingView Screener/scan, cached ~24h, with admin fallback) ----------
+// Uses the same batch "scan" endpoint that powers TradingView's own public Stock/Forex
+// Screener (scanner.tradingview.com/<market>/scan), not the older single-symbol lookup —
+// batching every tracked currency into one POST call is both faster and considerably more
+// reliable than fetching one at a time. Still undocumented/unofficial, so every call here
+// falls back to an admin-set rate if it ever fails. Admin-set fallback rates live in the
+// SAME sheet as the live TradingView cache (FxRates), just tagged with
 // source = 'admin_fallback' instead of 'tradingview' — see adminSetFxFallbackRate.
-function fetchTradingViewRate_(currencyCode) {
+function fetchTradingViewRatesBatch_(currencyCodes) {
+  const codes = Array.from(new Set(currencyCodes.map(function (c) { return String(c).toUpperCase(); })))
+    .filter(function (c) { return c && c !== 'USD'; });
+  if (!codes.length) return {};
+  const tickers = codes.map(function (c) { return 'FX_IDC:USD' + c; });
+  const payload = JSON.stringify({ symbols: { tickers: tickers, query: { types: [] } }, columns: ['close'] });
   try {
-    const ticker = 'FX_IDC:USD' + currencyCode;
-    const url = 'https://scanner.tradingview.com/symbol?symbol=' + encodeURIComponent(ticker) + '&fields=lp';
-    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (res.getResponseCode() !== 200) return null;
-    const data = JSON.parse(res.getContentText());
-    const rate = Number(data.lp || data.close || data.last_price);
-    return (rate && rate > 0) ? rate : null;
+    const res = UrlFetchApp.fetch('https://scanner.tradingview.com/forex/scan', {
+      method: 'post', contentType: 'text/plain;charset=UTF-8', payload: payload, muteHttpExceptions: true
+    });
+    if (res.getResponseCode() !== 200) return {};
+    const rows = (JSON.parse(res.getContentText()).data) || [];
+    const out = {};
+    rows.forEach(function (row) {
+      const ticker = String(row.s || ''); // e.g. "FX_IDC:USDNGN"
+      const code = ticker.indexOf(':') !== -1 ? ticker.split(':')[1].replace('USD', '') : '';
+      const close = row.d && row.d[0];
+      if (code && close && close > 0) out[code] = Number(close);
+    });
+    return out;
   } catch (err) {
-    return null;
+    return {};
   }
 }
 
@@ -124,7 +138,7 @@ function getFxRate_(currencyCode) {
     return { rate: Number(cached.rate), source: cached.source, fetchedAt: cached.fetchedAt };
   }
 
-  const liveRate = fetchTradingViewRate_(currency);
+  const liveRate = fetchTradingViewRatesBatch_([currency])[currency];
   if (liveRate) {
     setFxCacheRow_(currency, liveRate, 'tradingview');
     return { rate: liveRate, source: 'tradingview', fetchedAt: nowIso_() };
@@ -140,14 +154,16 @@ function getFxRate_(currencyCode) {
   throw new Error('No exchange rate available for ' + currency + ' — ask an admin to set a fallback rate in Settings → Live FX rate cache.');
 }
 
-// Admin sets/updates a manual fallback rate. Writes into the SAME FxRates sheet/row the
-// TradingView scanner uses (via setFxCacheRow_), tagged source = 'admin_fallback', so
-// there's one single place — one row per currency — holding whichever rate is current.
-// A later successful TradingView fetch will overwrite this row with a 'tradingview' rate;
-// if TradingView then fails again, getFxRate_ falls back to whatever this row last held.
+// Admin sets/updates a manual fallback rate — and this is also how a currency is "created":
+// if the currency isn't in the FxRates sheet yet, this adds the row (see setFxCacheRow_).
+// Writes into the SAME FxRates sheet/row the TradingView scanner uses, just tagged
+// source = 'admin_fallback', so there's one single place — one row per currency — holding
+// whichever rate is current. A later successful TradingView fetch will overwrite this row
+// with a 'tradingview' rate; if TradingView then fails again, getFxRate_ falls back to
+// whatever this row last held.
 function adminSetFxFallbackRate(telegramId, currency, rate) {
   requireSuperAdmin_(telegramId);
-  const cur = String(currency).toUpperCase();
+  const cur = String(currency).toUpperCase().trim();
   const num = Number(rate);
   if (!cur || !num || num <= 0) throw new Error('Provide a currency code and a positive rate.');
   setFxCacheRow_(cur, num, 'admin_fallback');
@@ -183,17 +199,21 @@ function adminGetFxRates(telegramId) {
   return sheetToObjects_(SHEET_NAMES.FX_RATES);
 }
 
+// Refreshes every currency this project has ever tracked in one batch call: whatever's
+// already in the FxRates sheet (including any an admin has added via adminSetFxFallbackRate)
+// plus whatever's still listed on a bot's legacy "currencies" field, unioned together.
 function adminRefreshFxRates(telegramId) {
   requireSuperAdmin_(telegramId);
-  const results = [];
   const currencies = Array.from(new Set(
-    sheetToObjects_(SHEET_NAMES.BOTS).flatMap(function (b) { return String(b.currencies || '').split(',').map(function (c) { return c.trim().toUpperCase(); }); })
+    sheetToObjects_(SHEET_NAMES.FX_RATES).map(function (r) { return String(r.currency || '').toUpperCase(); })
+      .concat(sheetToObjects_(SHEET_NAMES.BOTS).flatMap(function (b) { return String(b.currencies || '').split(',').map(function (c) { return c.trim().toUpperCase(); }); }))
       .filter(function (c) { return c && c !== 'USD'; })
   ));
-  currencies.forEach(function (cur) {
-    const liveRate = fetchTradingViewRate_(cur);
-    if (liveRate) { setFxCacheRow_(cur, liveRate, 'tradingview'); results.push({ currency: cur, rate: liveRate, ok: true }); }
-    else results.push({ currency: cur, ok: false });
+  const rates = fetchTradingViewRatesBatch_(currencies);
+  const results = currencies.map(function (cur) {
+    const rate = rates[cur];
+    if (rate) { setFxCacheRow_(cur, rate, 'tradingview'); return { currency: cur, rate: rate, ok: true }; }
+    return { currency: cur, ok: false };
   });
   logAudit_(telegramId, 'refresh_fx_rates', 'fx', '', currencies.join(', '));
   return results;

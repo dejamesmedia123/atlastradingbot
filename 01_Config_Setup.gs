@@ -57,6 +57,7 @@ const DEFAULT_SETTINGS = {
   botUsername: '',
   flutterwavePublicKey: '',
   flutterwaveCountries: 'NG,GH,KE,ZA,UG,TZ,RW,ZM,CI,SN,CM',
+  cryptoDepositInstructions: 'Not configured yet — contact support before sending a crypto deposit.',
   directCommissionPct: 15,
   uplineCommissionPct: 3,
   payoutThreshold: 20,
@@ -125,9 +126,29 @@ function setupSheets() {
 }
 
 // ---------- WEB APP ENTRY ----------
-// The frontend is fully static now (GitHub Pages), so GET just confirms the API is alive.
+// The frontend is fully static now (GitHub Pages). All RPC calls (reads AND writes) go
+// through doGet, as ?fn=functionName&args=<JSON array, URI-encoded>. This is deliberate:
+// Apps Script's /exec URL replies with a redirect to actually execute the request, and
+// browsers silently convert a POST into a GET (dropping the body) when following that
+// redirect — so a POST-based RPC call never actually reaches doPost with its data intact.
+// GET isn't affected by that conversion, so it's the reliable choice here.
 function doGet(e) {
-  return jsonOut_({ ok: true, service: 'AtlasTradeAI API', usage: 'POST {"fn":"functionName","args":[...]} to this same /exec URL.' });
+  const params = (e && e.parameter) || {};
+  if (params.fn) return handleRpc_(params.fn, params.args);
+  return jsonOut_({ ok: true, service: 'AtlasTradeAI API', usage: 'GET ?fn=functionName&args=<JSON array> on this same /exec URL.' });
+}
+
+function handleRpc_(fn, argsJson) {
+  try {
+    const args = argsJson ? JSON.parse(argsJson) : [];
+    if (!Object.prototype.hasOwnProperty.call(RPC_FUNCTIONS, fn)) {
+      return jsonOut_({ ok: false, error: 'Unknown function: ' + fn });
+    }
+    const result = RPC_FUNCTIONS[fn].apply(null, args);
+    return jsonOut_({ ok: true, result: (result === undefined ? null : result) });
+  } catch (err) {
+    return jsonOut_({ ok: false, error: String((err && err.message) || err) });
+  }
 }
 
 // Every RPC-callable backend function goes here, keyed by name. This is a whitelist —
@@ -158,24 +179,11 @@ const RPC_FUNCTIONS = {
   adminGetAuditLog
 };
 
-// Flutterwave webhook: POST .../exec?source=flw_webhook
-// RPC calls from the static frontend: POST .../exec with body {"fn":"...","args":[...]}
+// Flutterwave webhook only — the frontend never calls doPost (see doGet above).
 function doPost(e) {
   const source = e && e.parameter && e.parameter.source;
   if (source === 'flw_webhook') return handleFlutterwaveWebhook_(e);
-
-  try {
-    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    const fn = body.fn;
-    const args = Array.isArray(body.args) ? body.args : [];
-    if (!Object.prototype.hasOwnProperty.call(RPC_FUNCTIONS, fn)) {
-      return jsonOut_({ ok: false, error: 'Unknown function: ' + fn });
-    }
-    const result = RPC_FUNCTIONS[fn].apply(null, args);
-    return jsonOut_({ ok: true, result: (result === undefined ? null : result) });
-  } catch (err) {
-    return jsonOut_({ ok: false, error: String((err && err.message) || err) });
-  }
+  return jsonOut_({ ok: false, error: 'unknown source' });
 }
 
 function jsonOut_(obj) {
